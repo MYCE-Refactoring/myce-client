@@ -1,0 +1,153 @@
+/* 전체 배경 */
+.wrapper {
+  width: 100%;
+  background: #f9fafb;
+  min-height: 100vh;
+
+  box-sizing: border-box;
+  font-family: 'Noto Sans KR', sans-serif;
+}
+
+.container {
+  width: 100%;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  padding: 32px;
+  box-sizing: border-box;
+}
+
+/* 페이지 제목 */
+.pageTitle {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0.75rem;
+}
+
+/* 카드 리스트: 2개씩 한 줄, gap 유지, 반응형 대응 */
+.list {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+/* 카드: 내용/포스터 flex, 너비·높이 고정 */
+.card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  padding: 24px;
+  display: flex;
+  gap: 20px;
+  width: calc(50% - 10px);      /* 한 줄에 2개 */
+  min-height: 210px;            /* 카드 최소 높이 맞춤 */
+  box-sizing: border-box;
+  align-items: stretch;         /* 내부 높이 동일하게 */
+  transition: border-color 0.2s ease;
+}
+
+.card:hover {
+  border-color: #c0c0c0;
+}
+
+/* 카드 내 정보(본문) */
+.info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info h3 {
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.detailBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* 각 라벨-값 덩어리 간 간격 */
+  margin-top: 12px;
+}
+
+.detailLabel {
+  font-weight: 600;
+  font-size: 15px;
+  color: #1a1a1a;
+  margin-bottom: 2px;
+}
+
+.detailValue {
+  font-size: 15px;
+  color: #444;
+  margin-bottom: 2px;
+}
+
+.buttons {
+  margin-top: auto;
+  display: flex;
+  gap: 12px;
+}
+
+.primaryBtn {
+  background-color: black;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.primaryBtn:hover {
+  background-color: #333;
+}
+
+.secondaryBtn {
+  background-color: white;
+  border: 1px solid #ccc;
+  color: #333;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.secondaryBtn:hover {
+  background-color: #eee;
+}
+
+.poster {
+  width: 160px;
+  height: auto;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.noData {
+  text-align: center;
+  color: #666;
+  font-size: 16px;
+  margin-top: 60px;
+}
+
+.loading {
+  text-align: center;
+  color: #666;
+  font-size: 16px;
+  margin-top: 60px;
+}
+
+.error {
+  text-align: center;
+  color: #e74c3c;
+  font-size: 16px;
+  margin-top: 60px;
+}

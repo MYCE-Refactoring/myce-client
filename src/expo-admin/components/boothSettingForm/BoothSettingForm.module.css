@@ -1,0 +1,133 @@
+/* BoothSettingForm.module.css */
+.container {
+  width: 100%;
+  font-family: 'Pretendard', sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  box-sizing: border-box;
+}
+
+/* 포스터 */
+.posterWrapper {
+  width: 300px;
+}
+
+.posterImage {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  display: block;
+}
+
+/* 입력 영역 양열 배치 */
+.formGrid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 40px;
+  width: 100%;
+  align-items: flex-start;
+  box-sizing: border-box;
+}
+
+.leftColumn {
+  flex: 0 0 30%;
+  min-width: 250px;
+}
+
+.rightColumn {
+  flex: 0 0 66%;
+}
+
+/* 폼 항목 */
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  margin-bottom: 15px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #777;
+  margin-bottom: 4px;
+}
+
+.inputField {
+  padding: 10px 36px 10px 0;
+  font-size: 14px;
+  color: #333;
+  border: none;
+  border-bottom: 1px solid #ccc;
+  background-color: transparent;
+  outline: none;
+  width: 100%;
+}
+
+/* 포커스 시 밑줄 색상 */
+.inputField:focus {
+  border-color: #1e2a38;
+}
+
+/* 비활성화 input 스타일 */
+.inputField:disabled {
+  color: #aaa;
+  border-bottom: 1px dashed #ccc;
+  cursor: not-allowed;
+}
+
+.inputField:disabled::placeholder {
+  color: #ccc;
+  opacity: 1;
+}
+
+/* 에러 메시지 (인풋 색은 변경하지 않음) */
+.errorText {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #e53935;
+}
+
+/* 버튼 */
+.buttonGroup {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  font-size: 12px;
+  font-weight: 400;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.submitBtn {
+  background-color: #1e2a38;
+  color: white;
+}
+
+.submitBtn:hover {
+  background-color: #2c3e50;
+}
+
+.cancelBtn {
+  background-color: #ececec;
+  color: #1e2a38;
+}
+
+.cancelBtn:hover {
+  background-color: #d9d9d9;
+  color: #1e2a38;
+}

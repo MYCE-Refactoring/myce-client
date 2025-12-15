@@ -1,0 +1,116 @@
+.paymentContainer {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  margin: 10px 0;
+  width: 100%;
+}
+
+.topControls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Events와 동일한 필터 박스 톤 */
+.filterGroup {
+  display: flex;
+  align-items: center;
+  border: 1px solid #ddd;
+  background-color: #fff;
+  padding: 7px 10px;
+  gap: 8px;
+}
+
+/* 공통 셀렉트 */
+.select {
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: #333;
+  outline: none;
+  cursor: pointer;
+  padding-right: 4px;
+}
+
+/* 검색 인풋 */
+.input {
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  outline: none;
+  width: 160px;
+}
+
+/* 날짜 인풋 */
+.dateInput {
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: #333;
+  outline: none;
+  cursor: pointer;
+  padding-right: 4px;
+}
+
+/* ~ 구분자 */
+.rangeSep {
+  color: #999;
+  font-size: 13px;
+  padding: 0 2px;
+}
+
+/* 검색 아이콘 */
+.searchIcon {
+  color: #888;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* 오른쪽 버튼 영역 */
+.buttons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 액션 버튼 */
+.actionBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.2s ease;
+}
+
+/* 엑셀 추출 버튼 */
+.qrBtn {
+  background-color: #ececec;
+  color: #1e2a38;
+  font-size: 12px;
+  font-weight: 400;
+}
+.qrBtn:hover {
+  background-color: #d9d9d9;
+  color: #1e2a38;
+}
+
+/* 아이콘 */
+.icon {
+  font-size: 14px;
+  margin-right: 4px;
+}

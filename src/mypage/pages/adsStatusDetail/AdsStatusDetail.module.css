@@ -1,0 +1,53 @@
+.wrapper {
+  width: 100%;
+  background: #f9fafb;
+  min-height: 100vh;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* 실제 콘텐츠 컨테이너 - 전체 너비 사용하고 외부 프레임 적용 */
+.inner {
+  width: 100%;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  padding: 32px;
+  box-sizing: border-box;
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.pageTitle {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 0;
+  letter-spacing: -0.5px;
+  color: #1a1a1a;
+}
+
+.statusBadge {
+  display: inline-block;
+  min-width: 58px;
+  padding: 5px 18px;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  margin: 0 2px;
+  letter-spacing: -0.2px;
+  border: none;
+}
+.pending { background: #fffbe4; color: #b28a15; }
+.waiting { background: #eaf4fd; color: #357ec7; }
+.active  { background: hsl(150, 67%, 94%); color: #29966a; }
+.canceled{ background: #faeded; color: #e05260; }
+.finished{ background: #f6f6f7; color: #a6adb6; }

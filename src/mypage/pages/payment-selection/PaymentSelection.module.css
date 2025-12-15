@@ -1,0 +1,98 @@
+/* 전체 페이지 배경에 영향을 주기 위한 트릭 */
+:global(body) {
+  background-color: #f4f6f8;
+}
+
+/* 결제 페이지 컨테이너 */
+.container {
+  max-width: 520px;
+  margin: 60px auto;
+  padding: 32px 40px;
+  background-color: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+}
+
+/* 페이지 제목 */
+.title {
+  font-size: 26px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 30px;
+  color: #212529;
+}
+
+/* 섹션 (결제 정보, 결제 수단) */
+.section {
+  margin-bottom: 30px;
+}
+
+/* 섹션 제목 */
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 16px;
+  padding-left: 8px;
+  border-left: 3px solid #212529; /* 포인트 컬러로 강조 */
+  border-bottom: none; 
+  padding-bottom: 0;
+}
+
+/* 결제 정보 요약 박스 */
+.paymentSummary {
+  border: none;
+  border-radius: 12px;
+  padding: 0; /* 내부 패딩 제거 */
+  margin-bottom: 30px;
+  background-color: transparent; /* 배경 제거 */
+}
+
+/* 결제 정보 각 항목 */
+.summaryItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 15px;
+  padding: 16px 8px; /* 상하 패딩 증가 */
+  border-bottom: 1px solid #f1f3f5; /* 옅은 구분선 */
+  margin-bottom: 0;
+}
+
+.summaryItem:last-child {
+  border-bottom: none;
+}
+
+.summaryItem span:first-child {
+  color: #868e96; /* 항목 이름 색상 */
+}
+
+.summaryItem span:last-child {
+  font-weight: 500;
+  color: #343a40;
+}
+
+/* 총 결제 금액 - 라벨 */
+.totalAmountLabel {
+  font-size: 16px;
+  font-weight: 600;
+  color: #343a40;
+}
+
+/* 총 결제 금액 - 실제 금액 */
+.totalAmount {
+  font-size: 22px;
+  font-weight: 700;
+  color: #212529;
+}
+
+/* 에러 메시지 스타일 */
+.error {
+  color: #d93025;
+  text-align: center;
+  padding: 20px;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 8px;
+}

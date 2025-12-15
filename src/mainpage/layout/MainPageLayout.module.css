@@ -1,0 +1,16 @@
+/* src/mainpage/layout/MainPageLayout.module.css */
+.layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #ffffff;
+  width: 100%;
+}
+
+.mainContent {
+  flex-grow: 1;
+  padding: 0;
+  border: none;
+  border-bottom: none;
+  width: 100%;
+}

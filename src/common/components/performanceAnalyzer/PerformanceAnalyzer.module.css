@@ -1,0 +1,154 @@
+.analyzer {
+  max-width: 800px;
+  margin: 20px auto;
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  font-family: Arial, sans-serif;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #eee;
+}
+
+.header h3 {
+  margin: 0;
+  color: #333;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+.exportBtn, .clearBtn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.exportBtn {
+  background-color: #007bff;
+  color: white;
+}
+
+.exportBtn:hover {
+  background-color: #0056b3;
+}
+
+.clearBtn {
+  background-color: #dc3545;
+  color: white;
+}
+
+.clearBtn:hover {
+  background-color: #c82333;
+}
+
+.section {
+  margin-bottom: 30px;
+  padding: 15px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+.section h4 {
+  margin: 0 0 15px 0;
+  color: #444;
+  font-size: 16px;
+}
+
+.comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 15px;
+}
+
+.method h5 {
+  margin: 0 0 8px 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #777;
+}
+
+.conclusion {
+  text-align: center;
+  padding: 10px;
+  background: #e8f5e8;
+  border-radius: 4px;
+}
+
+.winner {
+  font-weight: bold;
+  color: #155724;
+}
+
+.recentData {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.recentData h5 {
+  margin: 0 0 10px 0;
+  color: #666;
+  font-size: 13px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 5px;
+}
+
+.dataItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px;
+  margin-bottom: 4px;
+  background: #f8f9fa;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.dataItem .method {
+  font-weight: bold;
+  color: #495057;
+  min-width: 50px;
+}
+
+.dataItem .time {
+  color: #6c757d;
+  font-size: 10px;
+}
+
+@media (max-width: 600px) {
+  .comparison,
+  .recentData {
+    grid-template-columns: 1fr;
+  }
+  
+  .header {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  
+  .analyzer {
+    margin: 10px;
+    padding: 15px;
+  }
+}

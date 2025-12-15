@@ -1,0 +1,459 @@
+.chatWrapper {
+  display: flex;
+  height: calc(100vh - 80px); /* 상단 헤더 제외한 높이 */
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+/* --- 좌측 채팅 목록 --- */
+.chatList {
+  width: 380px;
+  border-right: 1px solid #ddd;
+  padding: 1rem;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.chatRoomList {
+  margin-top: 1rem;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.5rem;
+  /* Better scrollbar styling */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+/* Webkit scrollbar styling for chat room list */
+.chatRoomList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chatRoomList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chatRoomList::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+.chatRoomList::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+.chatRoom {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  cursor: pointer;
+  border-radius: 8px;
+  position: relative;
+}
+
+.chatRoom:hover {
+  background-color: #f5f5f5;
+}
+
+.chatRoom.selected {
+  background-color: #e3f2fd;
+}
+
+.unreadBadge {
+  background-color: #ef4444;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 16px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.chatRoom img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+
+.chatRoomText {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+}
+
+.chatRoomText span {
+  color: gray;
+  font-size: 0.75rem;
+}
+
+/* --- 우측 채팅 영역 --- */
+.chatArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.chatHeader {
+  padding: 1rem;
+  border-bottom: 1px solid #ddd;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.chatMessages {
+  flex: 1;
+  padding: 1rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background-color: #fafafa;
+  /* Better scrollbar styling */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+/* Webkit scrollbar styling */
+.chatMessages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chatMessages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chatMessages::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+.chatMessages::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+/* Restore essential message layout styles that were working */
+.messageRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.messageRow img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.messageBubble {
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 0.6rem 1rem;
+  max-width: 70%;
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+.me {
+  justify-content: flex-end;
+}
+
+.myBubble {
+  background-color: #3478f6;
+  color: white;
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  max-width: 70%;
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+/* --- 메시지 정렬 --- */
+.messageRight {
+  justify-content: flex-end;
+}
+
+.messageLeft {
+  justify-content: flex-start;
+}
+
+/* --- 메시지 타입별 스타일 --- */
+.adminMessage {
+  background-color: white;
+  border: 1px solid #ddd;
+}
+
+.userMessage {
+  background-color: white;
+  border: 1px solid #ddd;
+}
+
+/* --- 발신자별 스타일 --- */
+.myMessage {
+  background-color: #3478f6;
+  color: white;
+  border: none;
+}
+
+
+/* --- 메시지 래퍼 (버블 + 시간/읽음표시) --- */
+.messageWrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.messageRight .messageWrapper {
+  flex-direction: row-reverse;
+}
+
+.messageLeft .messageWrapper {
+  flex-direction: row;
+}
+
+/* --- 메시지 정보 (시간 + 읽음표시) --- */
+.messageInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.messageRight .messageInfo {
+  align-items: flex-end;
+}
+
+.messageLeft .messageInfo {
+  align-items: flex-start;
+}
+
+.messageTime {
+  font-size: 0.7rem;
+  color: #999;
+  opacity: 0.8;
+}
+
+/* 읽음 표시 (카카오톡 스타일 - 버블 색상과 동일) */
+.unreadIndicator {
+  font-size: 10px;
+  color: white;
+  font-weight: bold;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* 파란색 버블용 (내 메시지) */
+.unreadIndicatorBlue {
+  background-color: #3478f6;
+}
+
+/* 회색 버블용 (상대방 메시지) */
+.unreadIndicatorGray {
+  background-color: #ddd;
+  color: #666;
+}
+
+/* --- 입력창 --- */
+.chatInput {
+  display: flex;
+  padding: 0.8rem;
+  border-top: 1px solid #ddd;
+  background: #f9f9f9;
+}
+
+.chatInput input {
+  flex: 1;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.chatInput button {
+  margin-left: 0.5rem;
+  background-color: #888;
+  color: white;
+  border: none;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+/* === 플랫폼 채팅방 전용 스타일 === */
+
+/* 플랫폼 채팅방 리스트 항목 */
+.platformChat {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #3b82f6;
+  border-radius: 8px !important;
+  margin-bottom: 4px;
+  position: relative;
+}
+
+.platformChat::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
+  background: #3b82f6;
+  border-radius: 50%;
+}
+
+.platformChat:hover {
+  background: #f1f5f9;
+  border-left-color: #2563eb;
+  transform: none;
+  transition: all 0.15s ease;
+}
+
+.platformChat.selected {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  border-left-color: #2563eb;
+  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 아바타 컨테이너 (채팅방 리스트용) */
+.avatarContainer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.platformAvatar {
+  border: 2px solid #2196F3;
+  box-shadow: 0 2px 4px rgba(33, 150, 243, 0.2);
+}
+
+/* 운영자 타입 라벨 (채팅방 리스트용) */
+.operatorType {
+  font-size: 9px;
+  color: #1976d2;
+  font-weight: bold;
+  text-align: center;
+  margin-top: 2px;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+/* 플랫폼 채팅방 제목 스타일 */
+.platformTitle {
+  font-weight: 600;
+  color: #1e40af;
+  font-size: 0.9rem;
+}
+
+.regularTitle {
+  color: #333;
+}
+
+/* Message avatar styles removed - handled by SharedChatArea */
+
+/* 운영자 라벨 (메시지용) */
+.operatorLabel {
+  font-size: 8px;
+  color: #666;
+  text-align: center;
+  margin-top: 2px;
+  font-weight: bold;
+  opacity: 0.8;
+}
+
+/* Message content and sender styles removed - handled by SharedChatArea */
+
+/* AI 메시지 특별 스타일 강화 */
+.aiMessage {
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #1e40af;
+  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.05);
+}
+
+/* 플랫폼 버튼 스타일 */
+.platformButton {
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.platformButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Pulse animation for human operator indicator */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+  }
+}
+
+/* Scroll to bottom button */
+.scrollToBottomButton {
+  position: absolute;
+  bottom: 80px;
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  z-index: 100;
+  opacity: 0;
+  transform: translateY(20px) scale(0.8);
+  pointer-events: none;
+}
+
+.scrollToBottomButton.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.scrollToBottomButton:hover {
+  background: #f5f5f5;
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.scrollToBottomButton svg {
+  width: 20px;
+  height: 20px;
+  color: #666;
+  transition: color 0.2s ease;
+}
+
+.scrollToBottomButton:hover svg {
+  color: #333;
+}

@@ -1,0 +1,84 @@
+.tableWrapper {
+  margin-top: 16px;
+  background-color: #fff;
+  border-radius: 7px;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.headerRow {
+  background-color: #f7f9fc;
+}
+
+.th {
+  text-align: center;
+  padding: 11px 16px;
+  font-size: 14px;
+  color: #555;
+  border-bottom: 1px solid #eee;
+  white-space: nowrap;
+}
+
+.row {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.td {
+  padding: 9px 16px;
+  font-size: 14px;
+  color: #222;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 24px 16px;
+  color: #888;
+  text-align: center;
+}
+
+/* --- Status Badge --- */
+.badge {
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* 활성 */
+.badgeActive {
+  background-color: #ebf9f1; /* 연한 초록 */
+  color: #2a9c68;            /* 진한 초록 */
+}
+
+/* 비활성 */
+.badgeInactive {
+  background-color: #f2f2f2; /* 연한 회색 */
+  color: #555;               /* 진한 회색 */
+}
+
+.detailBtn {
+  background-color: #ececec;
+  color: #1e2a38;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 18px;
+  font-size: 12px;
+  font-weight: 400;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.detailBtn:hover {
+  background-color: #d9d9d9;
+  color: #1e2a38;
+}

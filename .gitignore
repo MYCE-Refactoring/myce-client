@@ -1,0 +1,48 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+.env
+.env.*
+
+# AI Assistant configurations - keep out of version control
+# Claude Code
+CLAUDE.md
+.claude/
+.claude-config/
+claude-context.md
+claude-session.md
+pr.md
+
+# Gemini CLI
+.gemini/
+.gemini-config/
+GEMINI.md
+gemini-context.md
+gemini-session.md
+
+# Generic AI assistant files
+AI_CONTEXT.md
+ai-session.md
+.ai-config/

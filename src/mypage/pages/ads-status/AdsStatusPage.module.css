@@ -1,0 +1,131 @@
+.wrapper {
+  font-family: 'Noto Sans KR', sans-serif;
+  margin: 0 auto;
+  padding: 2rem;
+  background-color: #ffffff;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.pageTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0.75rem;
+}
+
+/* 테이블 전체 컨테이너 (가로 스크롤 대응) */
+.tableContainer {
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* 테이블 스타일 - 내부 프레임 제거 */
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  min-width: 760px; /* 내용 좁아지지 않게 최소폭 지정 */
+  margin-bottom: 1.5rem;
+}
+
+.table th, .table td {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  vertical-align: middle;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.table th {
+  background-color: #f3f4f6;
+  color: #4b5563;
+  font-weight: 600;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.clickableRow {
+  cursor: pointer;
+}
+
+.clickableRow:hover td {
+  background-color: #f3f4f6;
+  transition: background 0.12s;
+}
+
+/* badge 정렬을 위해 margin 조정 */
+.statusBadge {
+  margin-left: 0 !important;
+  margin-bottom: 0 !important;
+  vertical-align: middle;
+}
+
+/* 빈 상태 스타일 */
+.emptyState {
+  text-align: center;
+  padding: 3rem 0;
+  color: #6b7280;
+  font-size: 1.125rem;
+}
+
+/* 로딩 및 에러 상태 */
+.loading, .error {
+  text-align: center;
+  padding: 2rem;
+  font-size: 1.125rem;
+}
+
+.error {
+  color: #dc2626;
+}
+
+/* 페이지네이션 컨테이너 */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 2rem;
+  padding: 1rem 0;
+}
+
+/* 페이지네이션 버튼 스타일 */
+.pageBtn {
+  background-color: #fff;
+  border: 1px solid #dee2e6;
+  color: #495057;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 40px;
+  font-size: 14px;
+}
+
+.pageBtn:hover:not(.active) {
+  background-color: #f8f9fa;
+  border-color: #adb5bd;
+}
+
+.pageBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 현재 페이지 활성화 표시 */
+.pageBtn.active {
+  background-color: #000000;
+  border-color: #000000;
+  color: #fff;
+  font-weight: 600;
+}

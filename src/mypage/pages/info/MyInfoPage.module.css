@@ -1,0 +1,228 @@
+.wrapper {
+  width: 100%;
+  background: #f9fafb;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* 통합 카드 컨테이너 */
+.cardContainer {
+  width: 100%;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  padding: 32px;
+  box-sizing: border-box;
+}
+
+.pageTitle {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0.75rem;
+}
+
+.card {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 48px;
+  box-shadow: none;
+  border: none;
+}
+
+.sectionTitle {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 24px;
+  color: #1a1a1a;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+
+.formGroup,
+.formGroupFull {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.formGroupFull {
+  grid-column: span 2;
+}
+
+.formGroup label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #232323;
+  letter-spacing: -0.1px;
+}
+
+.genderGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.genderGroup > label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #232323;
+  letter-spacing: -0.1px;
+}
+
+.genderGroup > div {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.genderGroup label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+/* 표시용 값 스타일 (수정모드가 아닐 때) */
+.displayValue {
+  font-size: 15px;
+  padding: 12px 0;
+  border: none;
+  border-bottom: 1px solid #e0e0e0;
+  background: transparent;
+  color: #444;
+  min-height: 20px;
+  transition: border-color 0.2s ease;
+}
+
+/* 수정모드일 때의 input 스타일 */
+.inputText,
+.inputEmail,
+.inputDate,
+.inputTel {
+  padding: 12px 0;
+  border: none;
+  border-bottom: 1px solid #e0e0e0;
+  background: transparent;
+  font-size: 15px;
+  color: #444;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.inputText:focus,
+.inputEmail:focus,
+.inputDate:focus,
+.inputTel:focus {
+  border-bottom-color: #357ec7;
+}
+
+.disabled {
+  background-color: transparent;
+  color: #666;
+  cursor: not-allowed;
+  border-bottom-color: #f0f0f0;
+}
+
+.buttonGroup {
+  margin-top: 32px;
+  display: flex;
+  gap: 16px;
+}
+
+.modifyBtn {
+  background: black;
+  color: white;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.modifyBtn:hover {
+  background: #333;
+}
+
+.passwordBtn {
+  background: #6c757d;
+  color: white;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.passwordBtn:hover {
+  background: #5a6268;
+}
+
+.saveBtn {
+  background: #007bff;
+  color: white;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.saveBtn:hover {
+  background: #0056b3;
+}
+
+.cancelBtn {
+  background: #6c757d;
+  color: white;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.cancelBtn:hover {
+  background: #5a6268;
+}
+
+.dangerBox {
+  background: #fff1f1;
+  border: none;
+  padding: 24px;
+  border-radius: 12px;
+  margin-top: 32px;
+}
+
+.withdrawBtn {
+  margin-top: 10px;
+  background: #dc2626;
+  color: white;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.withdrawBtn:hover {
+  background: #b91c1c;
+}

@@ -1,0 +1,174 @@
+.tableWrapper {
+  margin-top: 24px;
+  background-color: #fff;
+  border-radius: 7px;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.headerRow {
+  background-color: #f7f9fc;
+}
+
+.th {
+  text-align: center;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #555;
+  border-bottom: 1px solid #eee;
+  white-space: nowrap;
+}
+
+.row {
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+}
+
+.td {
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #222;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.row:hover {
+  background-color: #f0f8ff;
+  cursor: pointer;
+}
+
+.selectedRow {
+  background-color: #f4f9ff;
+}
+
+/* ====== 상세(펼침) 영역: EmailTable과 동일 톤 ====== */
+.detailRow {
+  background-color: #fafcff;
+}
+
+.detailBox {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.detailItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+
+.detailLabel {
+  font-size: 13px;
+  color: #888;
+}
+
+.detailValue {
+  font-size: 15px;
+  color: #222;
+  font-weight: 500;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.recipientsList {
+  margin: 0;
+  padding-left: 18px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.moreBtn {
+  margin-top: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+.moreBtn:hover {
+  background: #f5f5f5;
+}
+
+/* ====== 공통 뱃지 ====== */
+.badge {
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* 결제 상태별 뱃지 */
+.badgePaid {
+  background-color: #ebf9f1;
+  color: #2a9c68;
+}
+
+.badgeCanceled {
+  background-color: #ffecec;
+  color: #e74c3c;
+}
+
+.badgePending {
+  background-color: #fff5ec;
+  color: #e79d3c;
+}
+
+.detailTableWrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.detailTable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #ffffff;
+  border-radius: 8px;
+}
+
+.detailTable thead tr {
+  background: #f9fafb;
+}
+
+.detailTable th,
+.detailTable td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 13px;
+  text-align: center;
+}
+
+.thMini {
+  width: 56px;
+  white-space: nowrap;
+}
+
+.tdIndex {
+  text-align: center;
+  color: #374151;
+  font-weight: 600;
+}
+
+.emailCell {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.emptyCell {
+  text-align: center;
+  color: #6b7280;
+  padding: 16px;
+}
