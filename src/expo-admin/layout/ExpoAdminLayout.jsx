@@ -43,7 +43,7 @@ function ExpoAdminLayout() {
         if (decoded?.loginType === "ADMIN_CODE") {
           // AdminCode 로그인 → API로 접근 검증
           try {
-            await instance.get(`/expos/${expoId}/chats/rooms`);
+            await instance.get(`/chats/expos/${expoId}/rooms`);
             setHasExpoAccess(true);
           } catch {
             setHasExpoAccess(false);

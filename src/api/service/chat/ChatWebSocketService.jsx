@@ -1,10 +1,11 @@
 import SockJS from 'sockjs-client';
 import { Stomp } from '@stomp/stompjs';
+import instance from '../../lib/axios';
 
 /**
  * MYCE 채팅 WebSocket 서비스
  * @description STOMP over SockJS를 사용한 실시간 채팅 구현
- * @specification CHAT_SYSTEM_README.md 기반 구현
+ * @specification 티켓 기반 인증 방식 사용
  */
 
 // WebSocket 연결 상태 관리
@@ -16,31 +17,46 @@ let unreadCountHandlers = new Map(); // unread count 핸들러 관리
 let connected = false;
 
 /**
+ * WebSocket 연결용 티켓 발급
+ * @returns {Promise<string>} 티켓 문자열
+ */
+const fetchTicket = async () => {
+  console.log('🎫 WebSocket 티켓 발급 요청...');
+  const response = await instance.post('/chats/ws/ticket');
+  const ticket = response.data.ticket;
+  console.log('🎫 티켓 발급 완료:', ticket.substring(0, 8) + '...');
+  return ticket;
+};
+
+/**
  * WebSocket 연결 수립
- * @param {string} token - JWT 인증 토큰
+ * @param {string} token - JWT 인증 토큰 (티켓 발급에 사용)
  * @param {number} userId - 사용자 ID
  * @returns {Promise<void>}
  */
 const connect = async (token, userId) => {
   try {
     console.log('🔌 WebSocket 연결 시작...', { userId, tokenExists: !!token });
-    
+
     if (connected) {
       console.log('🔄 기존 연결 해제 중...');
       disconnect();
     }
 
+    // 1. 티켓 발급 (Gateway를 통해 JWT 인증)
+    const ticket = await fetchTicket();
+
+    // 2. 티켓을 포함한 WebSocket URL 생성
     const getWebSocketURL = () => {
-      if (import.meta.env.DEV) {
-        return 'http://localhost:8080/ws/chat';
-      } else {
-        return 'https://api.myce.live/ws/chat';  // SockJS는 https:// 사용
-      }
+      const baseUrl = import.meta.env.DEV
+        ? 'http://localhost:8083/ws/chat'
+        : 'https://api.myce.live/ws/chat';
+      return `${baseUrl}?ticket=${ticket}`;
     };
-    
+
     const sockJSUrl = getWebSocketURL();
-    console.log('🌐 WebSocket URL:', sockJSUrl);
-    
+    console.log('🌐 WebSocket URL:', sockJSUrl.replace(ticket, ticket.substring(0, 8) + '...'));
+
     const socket = new SockJS(sockJSUrl);
     stompClient = Stomp.over(socket);
 
@@ -48,23 +64,11 @@ const connect = async (token, userId) => {
 
     return new Promise((resolve, reject) => {
       stompClient.connect(
-        {},
+        {}, // 헤더 불필요
         (frame) => {
           console.log('✅ WebSocket 연결 성공:', frame);
           connected = true;
-          
-          setTimeout(() => {
-            console.log('🔐 인증 시작...');
-            authenticate(token)
-              .then(() => {
-                console.log('✅ 인증 완료');
-                resolve();
-              })
-              .catch((authError) => {
-                console.error('❌ 인증 실패:', authError);
-                reject(authError);
-              });
-          }, 100);
+          resolve();
         },
         (error) => {
           console.error('❌ WebSocket 연결 실패:', error);
@@ -207,7 +211,7 @@ const joinRoom = async (roomId) => {
       }
       
       const unreadHandler = unreadCountHandlers.get(roomId);
-      if (unreadHandler && data.type === 'read_status_update') {
+      if (unreadHandler && data.type === 'READ_STATUS_UPDATE') {
         unreadHandler(data);
       }
       
@@ -255,15 +259,15 @@ const sendMessage = (roomId, content) => {
 
   const messagePayload = {
     roomId: roomId,
-    message: content,
+    content: content,
     sentAt: new Date().toISOString()
   };
 
   console.log('📨 WebSocket 메시지 전송:', messagePayload);
   
   try {
-    stompClient.send('/app/chat.send', {}, JSON.stringify(messagePayload));
-    console.log('✅ WebSocket 메시지 전송 성공');
+    stompClient.send('/app/message-send', {}, JSON.stringify(messagePayload));
+    console.log('✅ WebSocket 메시지 전송 성공', JSON.stringify(messagePayload));
   } catch (error) {
     console.error('❌ WebSocket 메시지 전송 실패:', error);
   }
@@ -406,14 +410,16 @@ const sendReadStatusNotification = (roomId) => {
  * @description 모든 구독 해제 후 연결 종료
  */
 const disconnect = () => {
+  console.trace('🔍 disconnect() 호출됨');
   if (stompClient && connected) {
     subscriptions.forEach(subscription => subscription.unsubscribe());
     subscriptions.clear();
     messageHandlers.clear();
     messageHandlersList.clear();
     unreadCountHandlers.clear();
-    
+
     stompClient.disconnect();
+    console.log('🔍 connected=false 설정 (disconnect 함수)');
     connected = false;
     stompClient = null;
   }
@@ -424,7 +430,7 @@ const disconnect = () => {
  * @param {string} roomCode - 채팅방 코드 (admin-{expoId}-{userId})
  * @param {string} content - 메시지 내용
  * @param {number} expoId - 박람회 ID
- * @description 백엔드의 /app/admin/chat.send 엔드포인트 사용
+ * @description 백엔드의 /app/admin/message-send 엔드포인트 사용
  */
 const sendAdminMessage = (roomCode, content, expoId) => {
   if (!connected) {
@@ -439,7 +445,7 @@ const sendAdminMessage = (roomCode, content, expoId) => {
     sentAt: new Date().toISOString()
   };
 
-  stompClient.send('/app/admin/chat.send', {}, JSON.stringify(messagePayload));
+  stompClient.send('/app/admin/cmessage-send', {}, JSON.stringify(messagePayload));
 };
 
 /**

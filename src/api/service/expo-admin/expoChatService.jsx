@@ -8,7 +8,7 @@ import instance from "../../lib/axios";
  * 해당 박람회의 채팅방 목록 조회
  */
 const getExpoChatRooms = async (expoId) => {
-    return await instance.get(`/expos/${expoId}/chats/rooms`);
+    return await instance.get(`/chats/expos/${expoId}/rooms`);
 }
 
 /**
@@ -19,7 +19,7 @@ const getExpoChatRooms = async (expoId) => {
  * @returns {Promise} API 응답
  */
 const getExpoChatMessages = async (expoId, roomCode, params = {}) => {
-    return await instance.get(`/expos/${expoId}/chats/rooms/${roomCode}/messages`, {
+    return await instance.get(`/chats/expos/${expoId}/rooms/${roomCode}/messages`, {
         params: params
     });
 }
@@ -32,7 +32,7 @@ const getExpoChatMessages = async (expoId, roomCode, params = {}) => {
  * @returns {Promise} API 응답
  */
 const markExpoChatAsRead = async (expoId, roomCode, lastReadMessageId) => {
-    return await instance.post(`/expos/${expoId}/chats/rooms/${roomCode}/read`, {
+    return await instance.post(`/chats/expos/${expoId}/rooms/${roomCode}/read`, {
         lastReadMessageId: lastReadMessageId
     });
 }
@@ -44,7 +44,7 @@ const markExpoChatAsRead = async (expoId, roomCode, lastReadMessageId) => {
  * @returns {Promise} API 응답
  */
 const getExpoChatUnreadCount = async (expoId, roomCode) => {
-    return await instance.get(`/expos/${expoId}/chats/rooms/${roomCode}/unread-count`);
+    return await instance.get(`/chats/expos/${expoId}/rooms/${roomCode}/unread-count`);
 }
 
 export {

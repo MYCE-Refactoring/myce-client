@@ -381,7 +381,7 @@ function PlatformInquiry() {
           
           // Subscribe to unread updates for read status handling
           ChatWebSocketService.subscribeToUnreadUpdates(room.roomCode, (updateData) => {
-            if (updateData.type === 'read_status_update') {
+            if (updateData.type === 'READ_STATUS_UPDATE') {
               const payload = updateData.payload || updateData;
               const readerType = payload.readerType;
               

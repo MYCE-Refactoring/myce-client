@@ -65,8 +65,8 @@ function Inquiry() {
       setError(null);
       
       // Use expo-specific endpoint for this expo's chat rooms
-      const response = await instance.get(`/expos/${expoId}/chats/rooms`);
-      const roomsData = response.data[0]?.chatRooms || response.data || [];
+      const response = await instance.get(`/chats/expos/${expoId}/rooms`);
+      const roomsData = response.data?.chatRooms || [];
       
       setChatRooms(roomsData);
       
@@ -328,7 +328,7 @@ function Inquiry() {
         
         // 읽음 상태 업데이트 핸들러 등록
         ChatWebSocketService.subscribeToUnreadUpdates(room.roomCode, (updateData) => {
-          if (updateData.type === 'read_status_update') {
+          if (updateData.type === 'READ_STATUS_UPDATE') {
             const payload = updateData.payload || updateData;
             const readerType = payload.readerType;
             
