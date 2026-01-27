@@ -15,6 +15,7 @@ import {
   getRoomCodeFromPayload,
   getUnreadCountFromPayload,
   getMessageId,
+  getReadSeqFromPayload,
 } from "../utils/messageUtils";
 
 export const useUserChatController = () => {
@@ -285,7 +286,7 @@ export const useUserChatController = () => {
                   [selectedRoom.roomCode]: newState,
                 }));
               }
-
+              console.log("@@@@@@@ New message!!! ", message);
               const resolvedMessageId = message.id || message.messageId;
               const newMessage = {
                 ...message,
@@ -403,27 +404,47 @@ export const useUserChatController = () => {
                 const readerType = getReaderTypeFromPayload(payload);
                 const messageId = payload.messageId || unreadData.messageId;
                 const currentMessages = messagesRef.current;
+                const readSeq = getReadSeqFromPayload(payload, unreadData);
 
                 if (readerType === "ADMIN" || readerType === "AI") {
                   try {
-                    let didUpdateLocal = false;
-                    if (messageId) {
-                      const hasMessage = currentMessages.some(
+                    if (Number.isFinite(readSeq)) {
+                      currentMessages.forEach((msg) => {
+                        const isMyMsg =
+                          msg.senderType === "USER" &&
+                          msg.senderId === currentUserId;
+                        if (!isMyMsg) {
+                          return;
+                        }
+                        const rawSeq = msg.seq;
+                        const msgSeq =
+                          typeof rawSeq === "number"
+                            ? rawSeq
+                            : typeof rawSeq === "string"
+                            ? Number(rawSeq)
+                            : null;
+                        if (!Number.isFinite(msgSeq) || msgSeq > readSeq) {
+                          return;
+                        }
+                        if (msg.unreadCount > 0) {
+                          const targetId = getMessageId(msg);
+                          if (targetId) {
+                            updateMessage(targetId, { unreadCount: 0 });
+                          }
+                        }
+                      });
+                    } else if (messageId) {
+                      const target = currentMessages.find(
                         (msg) => getMessageId(msg) === messageId
                       );
-                      if (hasMessage) {
-                        console.log(
-                          `🎯 Updating specific message unreadCount to 0: ${messageId}`
-                        );
+                      const isMyMessage =
+                        target &&
+                        target.senderType === "USER" &&
+                        target.senderId === currentUserId;
+                      if (isMyMessage) {
                         updateMessage(messageId, { unreadCount: 0 });
-                        didUpdateLocal = true;
                       }
                     } else {
-                      console.log(
-                        `🔄 No specific messageId, updating all my messages (${readerType} read them)`
-                      );
-
-                      let updatedCount = 0;
                       currentMessages.forEach((msg) => {
                         const isMyMsg =
                           msg.senderType === "USER" &&
@@ -432,16 +453,15 @@ export const useUserChatController = () => {
                           const targetId = getMessageId(msg);
                           if (targetId) {
                             updateMessage(targetId, { unreadCount: 0 });
-                            updatedCount += 1;
                           }
                         }
                       });
-                      if (updatedCount > 0) {
-                        didUpdateLocal = true;
-                      }
                     }
 
-                    const roomCode = getRoomCodeFromPayload(payload, unreadData);
+                    const roomCode =
+                      getRoomCodeFromPayload(payload, unreadData) ||
+                      selectedRoom?.roomCode ||
+                      null;
                     if (roomCode) {
                       console.log(`🔄 즉시 unreadCounts 업데이트: ${roomCode} → 0`);
                       setUnreadCounts((prev) => ({
@@ -449,48 +469,21 @@ export const useUserChatController = () => {
                         [roomCode]: 0,
                       }));
                     }
-
-                    const shouldRefetch =
-                      !didUpdateLocal || currentMessages.length === 0;
-                    if (shouldRefetch && selectedRoom && selectedRoom.roomCode) {
-                      const now = Date.now();
-                      const lastRefetch =
-                        lastReadStatusRefetchAt.current.get(
-                          selectedRoom.roomCode
-                        ) || 0;
-                      if (now - lastRefetch > 2000) {
-                        lastReadStatusRefetchAt.current.set(
-                          selectedRoom.roomCode,
-                          now
-                        );
-                        setTimeout(async () => {
-                          try {
-                            console.log(
-                              "🔄 Background refetch for accuracy after read status update"
-                            );
-                            await loadInitialMessages(selectedRoom.roomCode);
-                          } catch (error) {
-                            console.error("Background refetch failed:", error);
-                          }
-                        }, 1500);
-                      }
-                    }
                   } catch (error) {
                     console.error(
-                      "Failed to update read status, falling back to immediate refetch:",
+                      "Failed to update read status:",
                       error
                     );
-                    if (selectedRoom && selectedRoom.roomCode) {
-                      loadInitialMessages(selectedRoom.roomCode).catch(
-                        console.error
-                      );
-                    }
                   }
                 }
                 return;
               }
 
               const payload = unreadData.payload || unreadData;
+              const readerType = getReaderTypeFromPayload(payload);
+              if (readerType && readerType !== "USER") {
+                return;
+              }
               const roomCode = getRoomCodeFromPayload(payload, unreadData);
               const unreadCount = getUnreadCountFromPayload(payload);
               if (roomCode && typeof unreadCount === "number") {
@@ -567,7 +560,7 @@ export const useUserChatController = () => {
         ...messagePayload,
         id: `temp-${Date.now()}`,
         clientTemp: true,
-        unreadCount: 1,
+        unreadCount: 0,
       });
     } catch (error) {
       console.error("메시지 전송 실패:", error);

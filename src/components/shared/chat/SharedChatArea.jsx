@@ -26,6 +26,7 @@ export default function SharedChatArea({
   currentUserId,
   currentUserType, // 'USER' | 'ADMIN' | 'PLATFORM_ADMIN'
   alignBySenderType = false,
+  showUnreadForAllMessages = false,
   
   // Chat room info
   selectedRoom,
@@ -287,7 +288,8 @@ export default function SharedChatArea({
                       {/* Message metadata */}
                       <div className={styles.messageMetadata}>
                         {/* Unread count (for my messages) */}
-                        {isMyMsg && message.unreadCount > 0 && (
+                        {(isMyMsg || showUnreadForAllMessages) &&
+                          message.unreadCount > 0 && (
                           <span className={styles.unreadCount}>
                             {message.unreadCount}
                           </span>

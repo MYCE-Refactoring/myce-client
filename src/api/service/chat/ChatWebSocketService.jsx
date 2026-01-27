@@ -15,7 +15,19 @@ let messageHandlers = new Map(); // roomId -> single handler
 let messageHandlersList = new Map(); // roomId -> array of handlers (for multiple listeners)
 let unreadCountHandlers = new Map(); // unread count 핸들러 관리
 let connected = false;
+let connecting = false;
+const connectionListeners = new Set();
 const CHAT_ROOM_UPDATES_KEY = 'chat-room-updates';
+
+const notifyConnectionChange = (nextConnected) => {
+  connectionListeners.forEach((listener) => {
+    try {
+      listener(nextConnected);
+    } catch (error) {
+      console.error('connection listener error:', error);
+    }
+  });
+};
 
 const ensureChatRoomUpdatesSubscription = () => {
   if (!connected || !stompClient || subscriptions.has(CHAT_ROOM_UPDATES_KEY)) {
@@ -74,10 +86,17 @@ const connect = async (token, userId) => {
   try {
     console.log('🔌 WebSocket 연결 시작...', { userId, tokenExists: !!token });
 
+    if (connecting) {
+      console.log('⏳ WebSocket 연결 진행 중 - 중복 연결 시도 무시');
+      return;
+    }
+
     if (connected) {
       console.log('🔄 기존 연결 해제 중...');
       disconnect();
     }
+
+    connecting = true;
 
     // 1. 티켓 발급 (Gateway를 통해 JWT 인증)
     const ticket = await fetchTicket();
@@ -97,6 +116,24 @@ const connect = async (token, userId) => {
     stompClient = Stomp.over(socket);
 
     stompClient.debug = import.meta.env.DEV ? (...args) => console.log('📡 STOMP:', ...args) : () => {};
+    stompClient.onWebSocketClose = () => {
+      console.warn('🔌 WebSocket closed');
+      connected = false;
+      connecting = false;
+      notifyConnectionChange(false);
+    };
+    stompClient.onWebSocketError = (error) => {
+      console.warn('⚠️ WebSocket error', error);
+      connected = false;
+      connecting = false;
+      notifyConnectionChange(false);
+    };
+    stompClient.onStompError = (frame) => {
+      console.warn('⚠️ STOMP error', frame);
+      connected = false;
+      connecting = false;
+      notifyConnectionChange(false);
+    };
 
     return new Promise((resolve, reject) => {
       stompClient.connect(
@@ -104,11 +141,15 @@ const connect = async (token, userId) => {
         (frame) => {
           console.log('✅ WebSocket 연결 성공:', frame);
           connected = true;
+          connecting = false;
+          notifyConnectionChange(true);
           resolve();
         },
         (error) => {
           console.error('❌ WebSocket 연결 실패:', error);
           connected = false;
+          connecting = false;
+          notifyConnectionChange(false);
           reject(error);
         }
       );
@@ -116,6 +157,9 @@ const connect = async (token, userId) => {
 
   } catch (error) {
     console.error('❌ WebSocket 연결 중 오류:', error);
+    connected = false;
+    connecting = false;
+    notifyConnectionChange(false);
     throw error;
   }
 };
@@ -268,7 +312,7 @@ const joinRoom = async (roomId) => {
       });
       
       // Call global platform notification handler if it exists (for platform admin notifications)
-      if (window.globalPlatformNotificationHandler && roomId.startsWith('platform-')) {
+      if (roomId.startsWith('platform-') && window.globalPlatformNotificationHandler) {
         console.log('🔔 Calling global platform notification handler for room:', roomId);
         window.globalPlatformNotificationHandler(data, roomId);
       }
@@ -462,7 +506,9 @@ const disconnect = () => {
     stompClient.disconnect();
     console.log('🔍 connected=false 설정 (disconnect 함수)');
     connected = false;
+    connecting = false;
     stompClient = null;
+    notifyConnectionChange(false);
   }
 };
 
@@ -494,7 +540,19 @@ const sendAdminMessage = (roomCode, content, expoId) => {
  * @returns {boolean} 연결 상태
  */
 const isConnected = () => {
-  return connected;
+  return Boolean(connected && stompClient && stompClient.connected);
+};
+
+/**
+ * WebSocket 연결 상태 변경 구독
+ * @param {function} listener - (connected: boolean) => void
+ * @returns {function} - 구독 해제 함수
+ */
+const addConnectionListener = (listener) => {
+  connectionListeners.add(listener);
+  return () => {
+    connectionListeners.delete(listener);
+  };
 };
 
 /**
@@ -749,6 +807,7 @@ export {
   leaveRoom, 
   disconnect, 
   isConnected,
+  addConnectionListener,
   markAsReadViaWebSocket,
   subscribeToUnreadUpdates,
   subscribeToExpoAdminUpdates,

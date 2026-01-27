@@ -61,58 +61,23 @@ export function useWorkingChatScroll(loadMessagesFn) {
       currentPage.current = 0;
       isFirstLoad.current = true; // Mark as first load
       
-      console.log('🚀 Loading initial 8 messages for instant appearance:', roomCode);
+      console.log('🚀 Loading initial 10 messages for instant appearance:', roomCode);
       
       // Fewer messages so viewport starts at bottom
-      const response = await loadMessagesFn(roomCode, 0, 8);
+      const response = await loadMessagesFn(roomCode, 0, 10);
+      console.log('🚀 Initial message response:', response);
       const initialMessages = response.data?.content || response.data || [];
       
       if (initialMessages.length > 0) {
         // Sort chronologically (oldest first)
-        const sortedMessages = initialMessages.sort((a, b) => 
-          new Date(a.sentAt) - new Date(b.sentAt)
+        const sortedMessages = initialMessages.sort((a, b) =>
+          a.seq - b.seq
         );
 
         logUnreadSnapshot(`loadInitialMessages ${roomCode}`, sortedMessages);
 
-        setMessages(prev => {
-          if (prev.length > 0) {
-            const revivedUnread = sortedMessages
-              .filter((message) => (message?.unreadCount || 0) > 0)
-              .map((message) => {
-                const messageId = message.id || message.messageId;
-                if (!messageId) return null;
-                const prevMessage = prev.find(
-                  (prevItem) =>
-                    (prevItem.id || prevItem.messageId) === messageId
-                );
-                if (
-                  prevMessage &&
-                  (prevMessage.unreadCount || 0) === 0 &&
-                  (message.unreadCount || 0) > 0
-                ) {
-                  return {
-                    id: messageId,
-                    prevUnread: prevMessage.unreadCount || 0,
-                    nextUnread: message.unreadCount || 0,
-                    senderType: message.senderType,
-                    senderId: message.senderId,
-                  };
-                }
-                return null;
-              })
-              .filter(Boolean);
-
-            if (revivedUnread.length > 0) {
-              console.log(
-                "[ChatDebug] unread revived after refetch",
-                revivedUnread
-              );
-            }
-          }
-          return sortedMessages;
-        });
-        setHasMore(initialMessages.length === 8); // Has more if exactly 8
+        setMessages(sortedMessages);
+        setHasMore(initialMessages.length === 10); // Has more if exactly 8
         
         // IMPORTANT: Scroll to bottom after DOM updates - multiple attempts for reliability
         setTimeout(() => {
@@ -397,25 +362,27 @@ export function useWorkingChatScroll(loadMessagesFn) {
   
   /**
    * Reset state
+   *   - setLoadingOlder = 사용자에게 보여주기 위한 상태
+   *   - isLoadingOlderMessages = 스크롤 복원/로직 제어용 내부 플래그
    */
   const reset = useCallback(() => {
-    setMessages([]);
-    setLoading(false);
-    setLoadingOlder(false);
-    setHasMore(true);
-    setError(null);
-    currentRoomCode.current = null;
-    currentPage.current = 0;
+    setMessages([]); // 화면의 메시지 목록
+    setLoading(false); // 최초 / 일반 로딩 상태 해제 
+    setLoadingOlder(false); // 스크롤 위로 올릴 때 이전 메시지 로딩 상태 해제
+    setHasMore(true); // 더 불러올 메시지가 있다 플레그 ???
+    setError(null); // 메시지 로딩 에러 상태 제거 
+    currentRoomCode.current = null; // 현재 방 코드 초기화
+    currentPage.current = 0; // 페이지 인덱스 초기화
     
     // Reset scroll position tracking
-    previousScrollHeight.current = 0;
-    previousScrollTop.current = 0;
-    isLoadingOlderMessages.current = false;
-    isFirstLoad.current = true;
+    previousScrollHeight.current = 0; // 스크롤 높이 리셋
+    previousScrollTop.current = 0; // 스크롤 위치 리셋
+    isLoadingOlderMessages.current = false; // 이전 메시지 로딩 중 플레그 리셋
+    isFirstLoad.current = true; // 첫 로드 여부 다시 true 세팅
     
     // Reset preloading
-    preloadedMessages.current = null;
-    isPreloading.current = false;
+    preloadedMessages.current = null; // 미리 로딩해둔 메시지 캐싱 삭제
+    isPreloading.current = false; // 프리로드 진행 중 상태 해제
   }, []);
   
   return {

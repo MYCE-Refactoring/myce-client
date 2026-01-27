@@ -303,6 +303,10 @@
   justify-content: inherit;
 }
 
+.messageLeft .messageMetadata {
+  flex-direction: row-reverse;
+}
+
 .unreadCount {
   font-size: 10px;
   color: white;

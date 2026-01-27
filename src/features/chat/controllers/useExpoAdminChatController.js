@@ -6,7 +6,12 @@ import * as ChatWebSocketService from "../../../api/service/chat/ChatWebSocketSe
 import { getChatMessages } from "../../../api/service/chat/chatService";
 import { useWorkingChatScroll } from "../../../hooks/useWorkingChatScroll";
 import { useMessagesRef } from "../hooks/useMessagesRef";
-import { getLastReadSeq, getReaderTypeFromPayload, getMessageId } from "../utils/messageUtils";
+import {
+  getLastReadSeq,
+  getReaderTypeFromPayload,
+  getMessageId,
+  getReadSeqFromPayload,
+} from "../utils/messageUtils";
 
 export const useExpoAdminChatController = (expoId) => {
   const [chatRooms, setChatRooms] = useState([]);
@@ -18,6 +23,95 @@ export const useExpoAdminChatController = (expoId) => {
   const [currentUserId, setCurrentUserId] = useState(null);
   const isInquiryActiveRef = useRef(false);
   const activeRoomRef = useRef(null);
+
+  const isActiveRoom = useCallback((roomCode) => {
+    return (
+      isInquiryActiveRef.current &&
+      activeRoomRef.current &&
+      activeRoomRef.current === roomCode
+    );
+  }, []);
+
+  const isChatMessageType = useCallback((type) => {
+    return !type || type === "MESSAGE" || type === "ADMIN_MESSAGE";
+  }, []);
+
+  const getMessageRoomCode = useCallback((message) => {
+    const payload = message?.payload || message;
+    return (
+      payload?.roomCode ||
+      payload?.roomId ||
+      message?.roomCode ||
+      message?.roomId ||
+      null
+    );
+  }, []);
+
+  const buildMessageData = useCallback((message) => {
+    const payload = message?.payload || message;
+    const resolvedMessageId = payload?.messageId || message?.messageId || null;
+
+    return {
+      id: resolvedMessageId,
+      messageId: resolvedMessageId,
+      seq: payload?.seq || message?.seq,
+      content: payload?.content || message?.content,
+      senderId: payload?.senderId || message?.senderId,
+      senderType: payload?.senderType || message?.senderType || "USER",
+      senderName: payload?.senderName || message?.senderName,
+      sentAt: payload?.sentAt || message?.sentAt,
+      unreadCount:
+        payload?.unreadCount !== undefined
+          ? payload.unreadCount
+          : message?.unreadCount !== undefined
+          ? message.unreadCount
+          : 1,
+    };
+  }, []);
+
+  const requestReadForUserMessage = useCallback(
+    (messageData, roomCode) => {
+      if (messageData.senderType !== "USER") {
+        return;
+      }
+
+      const rawSeq = messageData.seq;
+      const lastReadSeq =
+        typeof rawSeq === "number"
+          ? rawSeq
+          : typeof rawSeq === "string"
+          ? Number(rawSeq)
+          : null;
+
+      if (!Number.isFinite(lastReadSeq)) {
+        return;
+      }
+
+      markExpoChatAsRead(expoId, roomCode, lastReadSeq).catch((err) =>
+        console.error("읽음 처리 실패:", err)
+      );
+    },
+    [expoId]
+  );
+
+  const handleAdminAssignmentUpdate = useCallback((payload) => {
+    setChatRooms((prev) =>
+      prev.map((roomItem) => {
+        if (roomItem.roomCode === payload.roomCode) {
+          if (roomItem.currentAdminCode === payload.currentAdminCode) {
+            return roomItem;
+          }
+
+          return {
+            ...roomItem,
+            currentAdminCode: payload.currentAdminCode,
+            adminDisplayName: payload.adminDisplayName,
+          };
+        }
+        return roomItem;
+      })
+    );
+  }, []);
 
   const {
     messages,
@@ -39,6 +133,44 @@ export const useExpoAdminChatController = (expoId) => {
   const messagesRef = useMessagesRef(messages);
   const isInitialLoad = loadingMessages;
 
+  const handleIncomingMessage = useCallback(
+    (roomCode, message) => {
+      if (!isActiveRoom(roomCode)) {
+        return;
+      }
+
+      const messageType = message?.type;
+      if (isChatMessageType(messageType)) {
+        const messageRoomCode = getMessageRoomCode(message);
+        if (messageRoomCode !== roomCode) {
+          return;
+        }
+
+        const messageData = buildMessageData(message);
+        addMessage(messageData);
+        requestReadForUserMessage(messageData, roomCode);
+        return;
+      }
+
+      if (
+        messageType === "admin_assignment_update" ||
+        messageType === "ADMIN_ASSIGNMENT_UPDATE"
+      ) {
+        const payload = message.payload || message;
+        handleAdminAssignmentUpdate(payload);
+      }
+    },
+    [
+      addMessage,
+      buildMessageData,
+      getMessageRoomCode,
+      handleAdminAssignmentUpdate,
+      isActiveRoom,
+      isChatMessageType,
+      requestReadForUserMessage,
+    ]
+  );
+
   useEffect(() => {
     loadChatRooms();
     connectWebSocket();
@@ -46,6 +178,9 @@ export const useExpoAdminChatController = (expoId) => {
 
   useEffect(() => {
     isInquiryActiveRef.current = true;
+    if (!ChatWebSocketService.isConnected()) {
+      connectWebSocket();
+    }
     return () => {
       isInquiryActiveRef.current = false;
       const activeRoom = activeRoomRef.current;
@@ -55,6 +190,34 @@ export const useExpoAdminChatController = (expoId) => {
       activeRoomRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const removeListener = ChatWebSocketService.addConnectionListener(
+      (nextConnected) => {
+        setWsConnected(nextConnected);
+      }
+    );
+    setWsConnected(ChatWebSocketService.isConnected());
+
+    return () => {
+      removeListener();
+    };
+  }, []);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (!isInquiryActiveRef.current) {
+        return;
+      }
+      if (!ChatWebSocketService.isConnected()) {
+        connectWebSocket();
+      }
+    }, 3000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [expoId]);
 
   useEffect(() => {
     return () => {
@@ -243,103 +406,39 @@ export const useExpoAdminChatController = (expoId) => {
       if (room?.roomCode) {
         const initialMessages = await loadInitialMessages(room.roomCode);
 
-        try {
-          const lastReadSeq = getLastReadSeq(initialMessages);
-          await markExpoChatAsRead(expoId, room.roomCode, lastReadSeq);
+        if (wsConnected && ChatWebSocketService.isConnected()) {
+          try {
+            const lastReadSeq = getLastReadSeq(initialMessages);
+            await markExpoChatAsRead(expoId, room.roomCode, lastReadSeq);
 
-          setChatRooms((prev) =>
-            prev.map((r) =>
-              r.roomCode === room.roomCode ? { ...r, unreadCount: 0 } : r
-            )
-          );
-        } catch (err) {
-          console.error("읽음 처리 실패:", err);
+            setChatRooms((prev) =>
+              prev.map((r) =>
+                r.roomCode === room.roomCode ? { ...r, unreadCount: 0 } : r
+              )
+            );
+
+            initialMessages.forEach((msg) => {
+              if (msg?.senderType !== "USER") {
+                return;
+              }
+              if ((msg?.unreadCount || 0) <= 0) {
+                return;
+              }
+              const targetId = getMessageId(msg);
+              if (targetId) {
+                updateMessage(targetId, { unreadCount: 0 });
+              }
+            });
+          } catch (err) {
+            console.error("읽음 처리 실패:", err);
+          }
         }
 
         if (wsConnected && ChatWebSocketService.isConnected()) {
           try {
             ChatWebSocketService.onMessage(room.roomCode, (newMessage) => {
-              if (
-                !isInquiryActiveRef.current ||
-                activeRoomRef.current !== room.roomCode
-              ) {
-                return;
-              }
-
-              if (
-                newMessage.type === "MESSAGE" ||
-                newMessage.type === "ADMIN_MESSAGE" ||
-                !newMessage.type
-              ) {
-                const messageRoomCode =
-                  newMessage.payload?.roomCode ||
-                  newMessage.payload?.roomId ||
-                  newMessage.roomCode ||
-                  newMessage.roomId;
-
-                if (messageRoomCode === room.roomCode) {
-                  const messageData = {
-                    id: newMessage.payload?.messageId || newMessage.messageId,
-                    seq: newMessage.payload?.seq || newMessage.seq,
-                    content: newMessage.payload?.content || newMessage.content,
-                    senderId: newMessage.payload?.senderId || newMessage.senderId,
-                    senderType:
-                      newMessage.payload?.senderType ||
-                      newMessage.senderType ||
-                      "USER",
-                    senderName:
-                      newMessage.payload?.senderName || newMessage.senderName,
-                    sentAt: newMessage.payload?.sentAt || newMessage.sentAt,
-                    unreadCount:
-                      newMessage.payload?.unreadCount !== undefined
-                        ? newMessage.payload?.unreadCount
-                        : newMessage.unreadCount !== undefined
-                        ? newMessage.unreadCount
-                        : 1,
-                  };
-
-                  addMessage(messageData);
-
-                  const isMyMessage =
-                    messageData.senderType === "ADMIN" &&
-                    messageData.senderId === currentUserId;
-                  if (messageData.senderType === "USER" && !isMyMessage) {
-                    const rawSeq = messageData.seq;
-                    const lastReadSeq =
-                      typeof rawSeq === "number"
-                        ? rawSeq
-                        : typeof rawSeq === "string"
-                        ? Number(rawSeq)
-                        : null;
-                    if (Number.isFinite(lastReadSeq)) {
-                      markExpoChatAsRead(expoId, room.roomCode, lastReadSeq).catch(
-                        (err) => console.error("읽음 처리 실패:", err)
-                      );
-                    }
-                  }
-                }
-              }
-
-              if (newMessage.type === "admin_assignment_update") {
-                const payload = newMessage.payload || newMessage;
-
-                setChatRooms((prev) =>
-                  prev.map((roomItem) => {
-                    if (roomItem.roomCode === payload.roomCode) {
-                      if (roomItem.currentAdminCode === payload.currentAdminCode) {
-                        return roomItem;
-                      }
-
-                      return {
-                        ...roomItem,
-                        currentAdminCode: payload.currentAdminCode,
-                        adminDisplayName: payload.adminDisplayName,
-                      };
-                    }
-                    return roomItem;
-                  })
-                );
-              }
+              console.log('@@@@@@@ new message!!!!!!!!!! ', newMessage);
+              handleIncomingMessage(room.roomCode, newMessage);
             });
 
             ChatWebSocketService.subscribeToUnreadUpdates(
@@ -348,6 +447,7 @@ export const useExpoAdminChatController = (expoId) => {
                 if (updateData.type === "READ_STATUS_UPDATE") {
                   const payload = updateData.payload || updateData;
                   const readerType = getReaderTypeFromPayload(payload);
+                  const readSeq = getReadSeqFromPayload(payload, updateData);
 
                   if (readerType === "USER") {
                     try {
@@ -356,7 +456,20 @@ export const useExpoAdminChatController = (expoId) => {
                         const isAdminMsg =
                           msg.senderType === "ADMIN" ||
                           msg.senderType === "PLATFORM_ADMIN";
-                        return isAdminMsg && msg.unreadCount > 0;
+                        if (!isAdminMsg || msg.unreadCount <= 0) {
+                          return false;
+                        }
+                        if (!Number.isFinite(readSeq)) {
+                          return true;
+                        }
+                        const rawSeq = msg.seq;
+                        const msgSeq =
+                          typeof rawSeq === "number"
+                            ? rawSeq
+                            : typeof rawSeq === "string"
+                            ? Number(rawSeq)
+                            : null;
+                        return Number.isFinite(msgSeq) && msgSeq <= readSeq;
                       });
                       const updatedCount = adminMessages.length;
 
@@ -392,6 +505,46 @@ export const useExpoAdminChatController = (expoId) => {
                       }
                     }
                   }
+                  if (readerType === "ADMIN") {
+                    try {
+                      const currentMessages = messagesRef.current;
+
+                      if (currentMessages.length === 0) {
+                        if (selectedRoom && selectedRoom.roomCode) {
+                          loadInitialMessages(selectedRoom.roomCode).catch(
+                            console.error
+                          );
+                        }
+                        return;
+                      }
+
+                      const userMessages = currentMessages.filter((msg) => {
+                        if (msg.senderType !== "USER" || msg.unreadCount <= 0) {
+                          return false;
+                        }
+                        if (!Number.isFinite(readSeq)) {
+                          return true;
+                        }
+                        const rawSeq = msg.seq;
+                        const msgSeq =
+                          typeof rawSeq === "number"
+                            ? rawSeq
+                            : typeof rawSeq === "string"
+                            ? Number(rawSeq)
+                            : null;
+                        return Number.isFinite(msgSeq) && msgSeq <= readSeq;
+                      });
+
+                      userMessages.forEach((msg) => {
+                        const targetId = getMessageId(msg);
+                        if (targetId) {
+                          updateMessage(targetId, { unreadCount: 0 });
+                        }
+                      });
+                    } catch (error) {
+                      console.error("Failed to update user read status:", error);
+                    }
+                  }
                 }
               }
             );
@@ -403,7 +556,14 @@ export const useExpoAdminChatController = (expoId) => {
         }
       }
     },
-    [selectedRoom, wsConnected, resetMessages, loadInitialMessages, addMessage]
+    [
+      selectedRoom,
+      wsConnected,
+      resetMessages,
+      loadInitialMessages,
+      updateMessage,
+      handleIncomingMessage,
+    ]
   );
 
   const handleSendMessage = useCallback(async () => {

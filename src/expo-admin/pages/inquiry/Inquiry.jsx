@@ -96,6 +96,7 @@ function Inquiry() {
             currentUserId={currentUserId}
             currentUserType="ADMIN"
             alignBySenderType
+            showUnreadForAllMessages
             selectedRoom={selectedRoom}
             newMessage={newMessage}
             onMessageChange={setNewMessage}

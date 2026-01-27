@@ -36,3 +36,23 @@ export const getUnreadCountFromPayload = (payload) => {
   const count = payload.unreadCount ?? payload.unReadCount;
   return typeof count === "number" ? count : undefined;
 };
+
+export const getReadSeqFromPayload = (payload, fallback) => {
+  const rawSeq =
+    payload?.seq ??
+    payload?.lastReadSeq ??
+    payload?.messageSeq ??
+    fallback?.seq ??
+    fallback?.lastReadSeq ??
+    fallback?.messageSeq ??
+    null;
+
+  const seqValue =
+    typeof rawSeq === "number"
+      ? rawSeq
+      : typeof rawSeq === "string"
+      ? Number(rawSeq)
+      : null;
+
+  return Number.isFinite(seqValue) ? seqValue : null;
+};

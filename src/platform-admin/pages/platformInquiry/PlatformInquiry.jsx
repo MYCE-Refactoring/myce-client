@@ -240,6 +240,7 @@ function PlatformInquiry() {
             currentUserId={currentUserId}
             currentUserType="PLATFORM_ADMIN"
             alignBySenderType
+            showUnreadForAllMessages
             selectedRoom={selectedRoom}
             newMessage={newMessage}
             onMessageChange={setNewMessage}
