@@ -25,6 +25,9 @@ dist-ssr
 
 .env
 .env.*
+env*
+
+docs
 
 # AI Assistant configurations - keep out of version control
 # Claude Code

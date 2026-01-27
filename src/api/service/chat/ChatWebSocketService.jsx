@@ -15,6 +15,42 @@ let messageHandlers = new Map(); // roomId -> single handler
 let messageHandlersList = new Map(); // roomId -> array of handlers (for multiple listeners)
 let unreadCountHandlers = new Map(); // unread count 핸들러 관리
 let connected = false;
+const CHAT_ROOM_UPDATES_KEY = 'chat-room-updates';
+
+const ensureChatRoomUpdatesSubscription = () => {
+  if (!connected || !stompClient || subscriptions.has(CHAT_ROOM_UPDATES_KEY)) {
+    return;
+  }
+
+  const chatRoomUpdatesChannel = `/topic/chat-room-updates`;
+  try {
+    const subscription = stompClient.subscribe(chatRoomUpdatesChannel, (message) => {
+      try {
+        const data = JSON.parse(message.body);
+        if (data.type !== 'UNREAD_COUNT_UPDATE' && data.type !== 'unread_count_update') {
+          return;
+        }
+
+        const payload = data.payload || data;
+        const roomCode = payload.roomCode || data.roomCode;
+        if (!roomCode) {
+          return;
+        }
+
+        const unreadHandler = unreadCountHandlers.get(roomCode);
+        if (unreadHandler) {
+          unreadHandler(data);
+        }
+      } catch (parseError) {
+        console.error('채팅방 업데이트 메시지 파싱 에러:', parseError);
+      }
+    });
+
+    subscriptions.set(CHAT_ROOM_UPDATES_KEY, subscription);
+  } catch (subscribeError) {
+    console.error('채팅방 업데이트 구독 실패:', subscribeError);
+  }
+};
 
 /**
  * WebSocket 연결용 티켓 발급
@@ -211,7 +247,7 @@ const joinRoom = async (roomId) => {
       }
       
       const unreadHandler = unreadCountHandlers.get(roomId);
-      if (unreadHandler && data.type === 'READ_STATUS_UPDATE') {
+      if (unreadHandler && (data.type === 'READ_STATUS_UPDATE' || data.type === 'UNREAD_COUNT_UPDATE')) {
         unreadHandler(data);
       }
       
@@ -241,7 +277,7 @@ const joinRoom = async (roomId) => {
     subscriptions.set(roomId, subscription);
   }
   stompClient.send('/app/join', {}, JSON.stringify({
-    roomId: roomId
+    roomCode: roomId
   }));
 };
 
@@ -258,7 +294,7 @@ const sendMessage = (roomId, content) => {
   }
 
   const messagePayload = {
-    roomId: roomId,
+    roomCode: roomId,
     content: content,
     sentAt: new Date().toISOString()
   };
@@ -316,6 +352,10 @@ const leaveRoom = (roomId) => {
   }
   messageHandlers.delete(roomId);
   messageHandlersList.delete(roomId);
+  unreadCountHandlers.delete(roomId);
+  if (window.buttonUpdateHandlers) {
+    window.buttonUpdateHandlers.delete(roomId);
+  }
 };
 
 /**
@@ -329,7 +369,7 @@ const markAsReadViaWebSocket = (roomId, messageId = null) => {
   }
 
   const payload = {
-    roomId: roomId,
+    roomCode: roomId,
     messageId: messageId
   };
 
@@ -343,6 +383,7 @@ const markAsReadViaWebSocket = (roomId, messageId = null) => {
  */
 const subscribeToUnreadUpdates = (roomId, handler) => {
   unreadCountHandlers.set(roomId, handler);
+  ensureChatRoomUpdatesSubscription();
 };
 
 /**
@@ -385,7 +426,7 @@ const requestUnreadCount = (roomId) => {
   }
 
   stompClient.send('/app/unread-count', {}, JSON.stringify({
-    roomId: roomId
+    roomCode: roomId
   }));
 };
 
@@ -393,13 +434,13 @@ const requestUnreadCount = (roomId) => {
  * 읽음 상태 WebSocket 알림 전송
  * @param {string} roomId - 채팅방 ID
  */
-const sendReadStatusNotification = (roomId) => {
+const sendReadStatusNotification = (roomCode) => {
   if (!connected) {
     return;
   }
 
   stompClient.send('/app/read-status-notify', {}, JSON.stringify({
-    roomId: roomId,
+    roomCode: roomCode,
     readerType: "USER",
     unreadCount: 0
   }));
@@ -440,12 +481,12 @@ const sendAdminMessage = (roomCode, content, expoId) => {
 
   const messagePayload = {
     roomCode: roomCode,
-    message: content,
+    content: content,
     expoId: expoId,
     sentAt: new Date().toISOString()
   };
 
-  stompClient.send('/app/admin/cmessage-send', {}, JSON.stringify(messagePayload));
+  stompClient.send('/app/admin/message-send', {}, JSON.stringify(messagePayload));
 };
 
 /**
@@ -496,14 +537,15 @@ const subscribeToExpoChatRoomUpdates = (expoId, handler) => {
     return null;
   }
 
-  const chatRoomUpdatesChannel = `/topic/expo/${expoId}/chat-room-updates`;
+  const chatRoomUpdatesChannel = `/topic/chat-room-updates`;
   
   try {
     const subscription = stompClient.subscribe(chatRoomUpdatesChannel, (message) => {
       try {
         const data = JSON.parse(message.body);
         // 새 메시지로 인한 unread count 업데이트 처리
-        if (data.type === 'unread_count_update' || data.type === 'new_message') {
+        if (data.type === 'UNREAD_COUNT_UPDATE' || data.type === 'unread_count_update'
+            || data.type === 'NEW_MESSAGE' || data.type === 'new_message') {
           handler(data);
         }
       } catch (parseError) {
@@ -599,19 +641,14 @@ const requestHandoff = async (roomCode) => {
       throw new Error('WebSocket이 연결되지 않음');
     }
 
-    const requestMessage = {
-      roomId: roomCode
-    };
-
-    console.log('📤 관리자 연결 요청 전송:', requestMessage);
+    const uri = '/app/request-handoff?roomCode='+roomCode;
     console.log('📤 Sending to endpoint: /app/request-handoff');
     console.log('🔍 DEBUGGING: 요청중인 roomCode:', roomCode);
-    console.log('🔍 DEBUGGING: 전송할 payload:', JSON.stringify(requestMessage));
     console.log('🔍 DEBUGGING: Connected?', connected, 'StompClient connected?', stompClient?.connected);
     console.log('🔍 DEBUGGING: Current subscriptions:', Array.from(subscriptions.keys()));
     console.log('🔍 DEBUGGING: Current message handlers:', Array.from(messageHandlers.keys()));
     
-    stompClient.send('/app/request-handoff', {}, JSON.stringify(requestMessage));
+    stompClient.send(uri, {});
     console.log('✅ 관리자 연결 요청 전송 완료');
     
     // Wait a bit and check if we received any messages back
@@ -636,12 +673,8 @@ const cancelHandoff = async (roomCode) => {
       throw new Error('WebSocket이 연결되지 않음');
     }
 
-    const requestMessage = {
-      roomId: roomCode
-    };
-
     console.log('관리자 연결 요청 취소 전송:', requestMessage);
-    stompClient.send('/app/cancel-handoff', {}, JSON.stringify(requestMessage));
+    stompClient.send('/app/cancel-handoff?roomCode='+roomCode, {});
   } catch (error) {
     console.error('관리자 연결 요청 취소 실패:', error);
     throw error;
@@ -659,12 +692,8 @@ const requestAI = async (roomCode) => {
       throw new Error('WebSocket이 연결되지 않음');
     }
 
-    const requestMessage = {
-      roomId: roomCode
-    };
-
     console.log('AI 복귀 요청 전송:', requestMessage);
-    stompClient.send('/app/request-ai', {}, JSON.stringify(requestMessage));
+    stompClient.send('/app/request-ai?roomCode='+roomCode, {});
   } catch (error) {
     console.error('AI 복귀 요청 실패:', error);
     throw error;
@@ -682,12 +711,8 @@ const proactiveIntervention = async (roomCode) => {
       throw new Error('WebSocket이 연결되지 않음');
     }
 
-    const interventionMessage = {
-      roomId: roomCode
-    };
-
     console.log('관리자 사전 개입 요청 전송:', interventionMessage);
-    stompClient.send('/app/proactive-intervention', {}, JSON.stringify(interventionMessage));
+    stompClient.send('/app/proactive-intervention?roomCode='+roomCode, {});
   } catch (error) {
     console.error('관리자 사전 개입 실패:', error);
     throw error;
@@ -704,11 +729,9 @@ const acceptHandoff = async (roomCode) => {
     if (!connected || !stompClient?.connected) {
       throw new Error('WebSocket이 연결되지 않음');
     }
-    const acceptMessage = {
-      roomId: roomCode
-    };
+
     console.log('관리자 인계 수락 요청 전송:', acceptMessage);
-    stompClient.send('/app/accept-handoff', {}, JSON.stringify(acceptMessage));
+    stompClient.send('/app/accept-handoff?roomCode='+roomCode, {});
   } catch (error) {
     console.error('관리자 인계 수락 실패:', error);
     throw error;

@@ -28,12 +28,12 @@ const getExpoChatMessages = async (expoId, roomCode, params = {}) => {
  * 관리자가 메시지를 읽음으로 처리
  * @param {number} expoId - 박람회 ID
  * @param {string} roomCode - 채팅방 코드
- * @param {string} lastReadMessageId - 마지막 읽은 메시지 ID
+ * @param {number} lastReadSeq - 마지막 읽은 메시지 seq
  * @returns {Promise} API 응답
  */
-const markExpoChatAsRead = async (expoId, roomCode, lastReadMessageId) => {
+const markExpoChatAsRead = async (expoId, roomCode, lastReadSeq) => {
     return await instance.post(`/chats/expos/${expoId}/rooms/${roomCode}/read`, {
-        lastReadMessageId: lastReadMessageId
+        lastReadSeq: lastReadSeq
     });
 }
 

@@ -20,10 +20,12 @@ const getAllUnreadCounts = async () => {
     return await instance.get(`${CHAT_PREFIX}/rooms/unread-counts`);
 }
 
-const markAsRead = async (roomCode, expoId = null) => {
+const markAsRead = async (roomCode, lastReadSeq = null) => {
     // 사용자는 항상 ChatRoomController 사용 (플랫폼/박람회 구분 없이)
     // ExpoChatController는 관리자 전용
-    return await instance.post(`${CHAT_PREFIX}/rooms/${roomCode}/read`, {});
+    return await instance.post(`${CHAT_PREFIX}/rooms/${roomCode}/read`, {
+        lastReadSeq: lastReadSeq
+    });
 }
 
 const getOrCreateExpoChatRoom = async (expoId) => {

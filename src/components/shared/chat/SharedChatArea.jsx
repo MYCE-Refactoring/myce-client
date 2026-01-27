@@ -25,6 +25,7 @@ export default function SharedChatArea({
   // User info
   currentUserId,
   currentUserType, // 'USER' | 'ADMIN' | 'PLATFORM_ADMIN'
+  alignBySenderType = false,
   
   // Chat room info
   selectedRoom,
@@ -70,12 +71,18 @@ export default function SharedChatArea({
 
   // Determine if message is from current user
   const isMyMessage = (message) => {
-    const result = currentUserType === 'USER' 
+    if (alignBySenderType && currentUserType !== 'USER') {
+      return (
+        message.senderType === 'ADMIN' ||
+        message.senderType === 'PLATFORM_ADMIN'
+      );
+    }
+
+    const result = currentUserType === 'USER'
       ? message.senderType === 'USER' && message.senderId === currentUserId
-      : message.senderType === 'ADMIN' && message.senderId === currentUserId;
-    
-    // Remove debug logging
-    
+      : (message.senderType === 'ADMIN' || message.senderType === 'PLATFORM_ADMIN')
+        && message.senderId === currentUserId;
+
     return result;
   };
 

@@ -27,12 +27,32 @@ export function useWorkingChatScroll(loadMessagesFn) {
   // Preloading for smoother experience
   const preloadedMessages = useRef(null);
   const isPreloading = useRef(false);
+
+  const logUnreadSnapshot = useCallback((label, messageList) => {
+    if (!Array.isArray(messageList)) {
+      return;
+    }
+
+    const unreadMessages = messageList
+      .filter((message) => (message?.unreadCount || 0) > 0)
+      .map((message) => ({
+        id: message.id || message.messageId,
+        senderType: message.senderType,
+        senderId: message.senderId,
+        unreadCount: message.unreadCount,
+        sentAt: message.sentAt,
+      }));
+
+    if (unreadMessages.length > 0) {
+      console.log(`[ChatDebug] ${label} unread snapshot`, unreadMessages);
+    }
+  }, []);
   
   /**
    * Load initial messages (fast, instant appearance)
    */
   const loadInitialMessages = useCallback(async (roomCode) => {
-    if (!roomCode || !loadMessagesFn) return;
+    if (!roomCode || !loadMessagesFn) return [];
     
     try {
       setLoading(true);
@@ -52,8 +72,46 @@ export function useWorkingChatScroll(loadMessagesFn) {
         const sortedMessages = initialMessages.sort((a, b) => 
           new Date(a.sentAt) - new Date(b.sentAt)
         );
-        
-        setMessages(sortedMessages);
+
+        logUnreadSnapshot(`loadInitialMessages ${roomCode}`, sortedMessages);
+
+        setMessages(prev => {
+          if (prev.length > 0) {
+            const revivedUnread = sortedMessages
+              .filter((message) => (message?.unreadCount || 0) > 0)
+              .map((message) => {
+                const messageId = message.id || message.messageId;
+                if (!messageId) return null;
+                const prevMessage = prev.find(
+                  (prevItem) =>
+                    (prevItem.id || prevItem.messageId) === messageId
+                );
+                if (
+                  prevMessage &&
+                  (prevMessage.unreadCount || 0) === 0 &&
+                  (message.unreadCount || 0) > 0
+                ) {
+                  return {
+                    id: messageId,
+                    prevUnread: prevMessage.unreadCount || 0,
+                    nextUnread: message.unreadCount || 0,
+                    senderType: message.senderType,
+                    senderId: message.senderId,
+                  };
+                }
+                return null;
+              })
+              .filter(Boolean);
+
+            if (revivedUnread.length > 0) {
+              console.log(
+                "[ChatDebug] unread revived after refetch",
+                revivedUnread
+              );
+            }
+          }
+          return sortedMessages;
+        });
         setHasMore(initialMessages.length === 8); // Has more if exactly 8
         
         // IMPORTANT: Scroll to bottom after DOM updates - multiple attempts for reliability
@@ -75,11 +133,12 @@ export function useWorkingChatScroll(loadMessagesFn) {
         setHasMore(false);
         isFirstLoad.current = false;
       }
-      
+      return initialMessages.length > 0 ? initialMessages : [];
     } catch (err) {
       console.error('Failed to load initial messages:', err);
       setError(err.message || 'Failed to load messages');
       setMessages([]);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -254,7 +313,20 @@ export function useWorkingChatScroll(loadMessagesFn) {
     });
     
     setMessages(prev => {
-      const exists = prev.some(msg => msg.id === newMessage.id);
+      const newId = newMessage.id || newMessage.messageId;
+      const newSeq =
+        newMessage.seq === null || newMessage.seq === undefined
+          ? null
+          : String(newMessage.seq);
+      const exists = prev.some(msg => {
+        const existingId = msg.id || msg.messageId;
+        if (newId && existingId && existingId === newId) {
+          return true;
+        }
+        const existingSeq =
+          msg.seq === null || msg.seq === undefined ? null : String(msg.seq);
+        return newSeq && existingSeq && existingSeq === newSeq;
+      });
       if (exists) {
         console.log('⚠️ Message already exists, skipping:', newMessage.id);
         return prev;
@@ -285,9 +357,13 @@ export function useWorkingChatScroll(loadMessagesFn) {
    * Update existing message
    */
   const updateMessage = useCallback((messageId, updates) => {
+    if (!messageId) {
+      return;
+    }
+    console.log("[ChatDebug] updateMessage", { messageId, updates });
     setMessages(prev => 
       prev.map(msg => 
-        msg.id === messageId ? { ...msg, ...updates } : msg
+        (msg.id === messageId || msg.messageId === messageId) ? { ...msg, ...updates } : msg
       )
     );
   }, []);
