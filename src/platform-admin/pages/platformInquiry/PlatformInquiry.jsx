@@ -187,18 +187,9 @@ function PlatformInquiry() {
             </div>
           )}
 
-          {selectedRoom && !requestingRooms.has(selectedRoom.roomCode) && (() => {
-            const currentState = determineRoomState(selectedRoom);
-            console.log("🎯 Banner state check:", {
-              roomCode: selectedRoom.roomCode,
-              currentState,
-              hasAssignedAdmin: selectedRoom.hasAssignedAdmin,
-              isWaitingForAdmin: selectedRoom.isWaitingForAdmin,
-              roomCurrentState: selectedRoom.currentState,
-              shouldShowBanner: currentState === ROOM_STATES.AI_ACTIVE,
-            });
-            return currentState === ROOM_STATES.AI_ACTIVE;
-          })() && (
+          {selectedRoom &&
+            !requestingRooms.has(selectedRoom.roomCode) &&
+            determineRoomState(selectedRoom) === ROOM_STATES.AI_ACTIVE && (
             <div className={styles.interventionBanner}>
               <div className={styles.interventionContent}>
                 <div className={styles.interventionIcon}>
@@ -240,6 +231,8 @@ function PlatformInquiry() {
             currentUserId={currentUserId}
             currentUserType="PLATFORM_ADMIN"
             alignBySenderType
+            alignAIAsMyMessage
+            hideAvatar
             showUnreadForAllMessages
             selectedRoom={selectedRoom}
             newMessage={newMessage}

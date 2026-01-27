@@ -53,6 +53,7 @@ export function useWorkingChatScroll(loadMessagesFn) {
    */
   const loadInitialMessages = useCallback(async (roomCode) => {
     if (!roomCode || !loadMessagesFn) return [];
+    const requestedRoom = roomCode;
     
     try {
       setLoading(true);
@@ -68,6 +69,10 @@ export function useWorkingChatScroll(loadMessagesFn) {
       console.log('🚀 Initial message response:', response);
       const initialMessages = response.data?.content || response.data || [];
       
+      if (currentRoomCode.current !== requestedRoom) {
+        return initialMessages.length > 0 ? initialMessages : [];
+      }
+
       if (initialMessages.length > 0) {
         // Sort chronologically (oldest first)
         const sortedMessages = initialMessages.sort((a, b) =>
@@ -101,11 +106,15 @@ export function useWorkingChatScroll(loadMessagesFn) {
       return initialMessages.length > 0 ? initialMessages : [];
     } catch (err) {
       console.error('Failed to load initial messages:', err);
-      setError(err.message || 'Failed to load messages');
-      setMessages([]);
+      if (currentRoomCode.current === requestedRoom) {
+        setError(err.message || 'Failed to load messages');
+        setMessages([]);
+      }
       return [];
     } finally {
-      setLoading(false);
+      if (currentRoomCode.current === requestedRoom) {
+        setLoading(false);
+      }
     }
   }, [loadMessagesFn]);
   

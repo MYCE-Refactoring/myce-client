@@ -9,6 +9,8 @@ import { useMessagesRef } from "../hooks/useMessagesRef";
 import {
   getLastReadSeq,
   getReaderTypeFromPayload,
+  getRoomCodeFromPayload,
+  getUnreadCountFromPayload,
   getMessageId,
   getReadSeqFromPayload,
 } from "../utils/messageUtils";
@@ -67,6 +69,55 @@ export const useExpoAdminChatController = (expoId) => {
           ? message.unreadCount
           : 1,
     };
+  }, []);
+
+  const updateRoomPreview = useCallback((roomCode, messageLike) => {
+    if (!roomCode) return;
+    const payload = messageLike?.payload || messageLike || {};
+    const content =
+      payload?.content ||
+      payload?.lastMessage ||
+      messageLike?.content ||
+      messageLike?.lastMessage;
+    if (!content) return;
+
+    const sentAt =
+      payload?.sentAt ||
+      payload?.lastMessageAt ||
+      messageLike?.sentAt ||
+      messageLike?.lastMessageAt ||
+      new Date().toISOString();
+    const messageId =
+      payload?.messageId ||
+      payload?.lastMessageId ||
+      messageLike?.messageId ||
+      messageLike?.lastMessageId ||
+      messageLike?.id ||
+      payload?.id ||
+      null;
+
+    setChatRooms((prev) =>
+      prev.map((room) =>
+        room.roomCode === roomCode
+          ? {
+              ...room,
+              lastMessage: content,
+              lastMessageAt: sentAt,
+              lastMessageId: messageId || room.lastMessageId,
+            }
+          : room
+      )
+    );
+
+    setSelectedRoom((prev) => {
+      if (!prev || prev.roomCode !== roomCode) return prev;
+      return {
+        ...prev,
+        lastMessage: content,
+        lastMessageAt: sentAt,
+        lastMessageId: messageId || prev.lastMessageId,
+      };
+    });
   }, []);
 
   const requestReadForUserMessage = useCallback(
@@ -147,6 +198,7 @@ export const useExpoAdminChatController = (expoId) => {
         }
 
         const messageData = buildMessageData(message);
+        updateRoomPreview(roomCode, messageData);
         addMessage(messageData);
         requestReadForUserMessage(messageData, roomCode);
         return;
@@ -168,6 +220,7 @@ export const useExpoAdminChatController = (expoId) => {
       isActiveRoom,
       isChatMessageType,
       requestReadForUserMessage,
+      updateRoomPreview,
     ]
   );
 
@@ -220,6 +273,63 @@ export const useExpoAdminChatController = (expoId) => {
   }, [expoId]);
 
   useEffect(() => {
+    if (!wsConnected) return;
+
+    const unsubscribe = ChatWebSocketService.subscribeToGlobalUnreadUpdates(
+      (unreadData) => {
+        const payload = unreadData.payload || unreadData;
+        const readerType = getReaderTypeFromPayload(payload);
+        if (readerType && readerType !== "ADMIN") {
+          return;
+        }
+        const roomCode = getRoomCodeFromPayload(payload, unreadData);
+        const unreadCount = getUnreadCountFromPayload(payload);
+        if (roomCode && typeof unreadCount === "number") {
+          setChatRooms((prev) =>
+            prev.map((room) =>
+              room.roomCode === roomCode
+                ? { ...room, unreadCount: unreadCount || 0 }
+                : room
+            )
+          );
+        }
+      }
+    );
+
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
+  }, [wsConnected]);
+
+  useEffect(() => {
+    if (!wsConnected) return;
+
+    const unsubscribe = ChatWebSocketService.subscribeToGlobalRoomUpdates(
+      (updateData) => {
+        if (
+          updateData.type !== "ROOM_PREVIEW_UPDATE" &&
+          updateData.type !== "room_preview_update"
+        ) {
+          return;
+        }
+        const payload = updateData.payload || updateData;
+        const roomCode = payload.roomCode;
+        if (roomCode) {
+          updateRoomPreview(roomCode, payload);
+        }
+      }
+    );
+
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
+  }, [wsConnected, updateRoomPreview]);
+
+  useEffect(() => {
     return () => {
       if (selectedRoom?.roomCode) {
         ChatWebSocketService.leaveRoom(selectedRoom.roomCode);
@@ -265,7 +375,6 @@ export const useExpoAdminChatController = (expoId) => {
         setTimeout(() => {
           subscribeToExpoAdminUpdatesFunc();
           subscribeToUserErrorsFunc();
-          subscribeToExpoChatRoomUpdatesFunc();
         }, 100);
       }
     } catch (err) {
@@ -357,33 +466,6 @@ export const useExpoAdminChatController = (expoId) => {
     }
   };
 
-  const subscribeToExpoChatRoomUpdatesFunc = () => {
-    if (!ChatWebSocketService.isConnected()) {
-      return;
-    }
-
-    try {
-      ChatWebSocketService.subscribeToExpoChatRoomUpdates(expoId, (updateData) => {
-        if (
-          updateData.type === "UNREAD_COUNT_UPDATE" ||
-          updateData.type === "new_message"
-        ) {
-          const payload = updateData.payload || updateData;
-          const { roomCode, unreadCount } = payload;
-
-          setChatRooms((prev) =>
-            prev.map((room) =>
-              room.roomCode === roomCode
-                ? { ...room, unreadCount: unreadCount || 0 }
-                : room
-            )
-          );
-        }
-      });
-    } catch (err) {
-      console.error("채팅방 목록 업데이트 구독 실패:", err);
-    }
-  };
 
   const handleRoomSelect = useCallback(
     async (room) => {

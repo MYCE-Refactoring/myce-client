@@ -26,6 +26,8 @@ export default function SharedChatArea({
   currentUserId,
   currentUserType, // 'USER' | 'ADMIN' | 'PLATFORM_ADMIN'
   alignBySenderType = false,
+  alignAIAsMyMessage = false,
+  hideAvatar = false,
   showUnreadForAllMessages = false,
   
   // Chat room info
@@ -75,14 +77,22 @@ export default function SharedChatArea({
     if (alignBySenderType && currentUserType !== 'USER') {
       return (
         message.senderType === 'ADMIN' ||
-        message.senderType === 'PLATFORM_ADMIN'
+        message.senderType === 'PLATFORM_ADMIN' ||
+        (alignAIAsMyMessage && message.senderType === 'AI')
       );
     }
 
+    const isSameSender =
+      message.senderId !== undefined &&
+      message.senderId !== null &&
+      currentUserId !== undefined &&
+      currentUserId !== null &&
+      String(message.senderId) === String(currentUserId);
+
     const result = currentUserType === 'USER'
-      ? message.senderType === 'USER' && message.senderId === currentUserId
+      ? message.senderType === 'USER' && (isSameSender || currentUserId === null || currentUserId === undefined)
       : (message.senderType === 'ADMIN' || message.senderType === 'PLATFORM_ADMIN')
-        && message.senderId === currentUserId;
+        && isSameSender;
 
     return result;
   };
@@ -247,6 +257,8 @@ export default function SharedChatArea({
               }
               
               const isMyMsg = isMyMessage(message);
+              const shouldShowSenderInfo =
+                !isMyMsg || message.senderType === "AI";
               const senderInfo = getMessageSenderInfo(message);
               
               return (
@@ -255,7 +267,7 @@ export default function SharedChatArea({
                   className={`${styles.messageRow} ${isMyMsg ? styles.messageRight : styles.messageLeft}`}
                 >
                   {/* Avatar (for others' messages) */}
-                  {!isMyMsg && senderInfo.avatar && (
+                  {shouldShowSenderInfo && senderInfo.avatar && !hideAvatar && (
                     <div className={styles.messageAvatar}>
                       <img 
                         src={senderInfo.avatar} 
@@ -267,7 +279,7 @@ export default function SharedChatArea({
 
                   <div className={styles.messageContent}>
                     {/* Sender name (for others' messages) */}
-                    {!isMyMsg && (
+                    {shouldShowSenderInfo && (
                       <div className={styles.senderName}>
                         {senderInfo.name}
                       </div>

@@ -28,6 +28,7 @@ export const useUserChatController = () => {
   const [buttonStates, setButtonStates] = useState({});
   const [currentUserId, setCurrentUserId] = useState(null);
   const [error, setError] = useState(null);
+  const currentUserIdRef = useRef(null);
   const [afterRedisResults, setAfterRedisResults] = useState({
     messageLoad: [],
     messageSend: [],
@@ -35,6 +36,7 @@ export const useUserChatController = () => {
   });
   const [cacheWarmedRooms, setCacheWarmedRooms] = useState(new Set());
   const lastReadStatusRefetchAt = useRef(new Map());
+  const pendingTempMessagesRef = useRef([]);
 
   const {
     messages,
@@ -55,6 +57,77 @@ export const useUserChatController = () => {
 
   const messagesRef = useMessagesRef(messages);
   const isInitialLoad = loadingMessages;
+
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
+
+  useEffect(() => {
+    if (currentUserId !== null && currentUserId !== undefined) {
+      return;
+    }
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      return;
+    }
+    try {
+      const decoded = jwtDecode(token);
+      if (decoded?.memberId !== null && decoded?.memberId !== undefined) {
+        setCurrentUserId(decoded.memberId);
+      }
+    } catch (error) {
+      console.error("토큰 디코딩 실패:", error);
+    }
+  }, [currentUserId]);
+
+  const updateRoomPreview = useCallback((roomCode, messageLike) => {
+    if (!roomCode) return;
+    const payload = messageLike?.payload || messageLike || {};
+    const content =
+      payload?.content ||
+      payload?.lastMessage ||
+      messageLike?.content ||
+      messageLike?.lastMessage;
+    if (!content) return;
+
+    const sentAt =
+      payload?.sentAt ||
+      payload?.lastMessageAt ||
+      messageLike?.sentAt ||
+      messageLike?.lastMessageAt ||
+      new Date().toISOString();
+    const messageId =
+      payload?.messageId ||
+      payload?.lastMessageId ||
+      messageLike?.messageId ||
+      messageLike?.lastMessageId ||
+      messageLike?.id ||
+      payload?.id ||
+      null;
+
+    setChatRooms((prev) =>
+      prev.map((room) =>
+        room.roomCode === roomCode
+          ? {
+              ...room,
+              lastMessage: content,
+              lastMessageAt: sentAt,
+              lastMessageId: messageId || room.lastMessageId,
+            }
+          : room
+      )
+    );
+
+    setSelectedRoom((prev) => {
+      if (!prev || prev.roomCode !== roomCode) return prev;
+      return {
+        ...prev,
+        lastMessage: content,
+        lastMessageAt: sentAt,
+        lastMessageId: messageId || prev.lastMessageId,
+      };
+    });
+  }, []);
 
   const isPlatformRoom = (room) => {
     return (
@@ -107,28 +180,34 @@ export const useUserChatController = () => {
     }
   };
 
-  useEffect(() => {
-    const initializeWebSocket = async () => {
-      try {
-        const token = localStorage.getItem("access_token");
-        if (!token) {
-          console.warn("로그인 토큰이 없습니다");
-          return;
-        }
-
-        const decodedToken = jwtDecode(token);
-        const userId = decodedToken.memberId;
-        setCurrentUserId(userId);
-
-        console.log("WebSocket 연결 시도...", userId);
-        await ChatWebSocketService.connect(token, userId);
-        setWsConnected(true);
-        console.log("WebSocket 연결 성공");
-      } catch (error) {
-        console.error("WebSocket 연결 실패:", error);
+  const connectWebSocket = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        console.warn("로그인 토큰이 없습니다");
+        return;
       }
-    };
 
+      const decodedToken = jwtDecode(token);
+      const userId = decodedToken.memberId;
+      setCurrentUserId(userId);
+
+      if (ChatWebSocketService.isConnected()) {
+        setWsConnected(true);
+        return;
+      }
+
+      console.log("WebSocket 연결 시도...", userId);
+      await ChatWebSocketService.connect(token, userId);
+      setWsConnected(true);
+      console.log("WebSocket 연결 성공");
+    } catch (error) {
+      console.error("WebSocket 연결 실패:", error);
+      setWsConnected(false);
+    }
+  }, []);
+
+  useEffect(() => {
     const fetchChatRooms = async () => {
       try {
         const response = await instance.get("/chats/rooms");
@@ -191,32 +270,109 @@ export const useUserChatController = () => {
       }
     };
 
-    initializeWebSocket();
+    connectWebSocket();
     fetchChatRooms();
     fetchUnreadCounts();
 
     return () => {
       ChatWebSocketService.disconnect();
     };
+  }, [connectWebSocket]);
+
+  useEffect(() => {
+    const removeListener = ChatWebSocketService.addConnectionListener(
+      (nextConnected) => {
+        setWsConnected(nextConnected);
+      }
+    );
+    setWsConnected(ChatWebSocketService.isConnected());
+
+    return () => {
+      removeListener();
+    };
   }, []);
 
   useEffect(() => {
-    if (!selectedRoom) {
+    const intervalId = setInterval(() => {
+      if (!ChatWebSocketService.isConnected()) {
+        connectWebSocket();
+      }
+    }, 3000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [connectWebSocket]);
+
+  useEffect(() => {
+    if (!wsConnected) return;
+
+    const unsubscribe = ChatWebSocketService.subscribeToGlobalUnreadUpdates(
+      (unreadData) => {
+        const payload = unreadData.payload || unreadData;
+        const readerType = getReaderTypeFromPayload(payload);
+        if (readerType && readerType !== "USER") {
+          return;
+        }
+        const roomCode = getRoomCodeFromPayload(payload, unreadData);
+        const unreadCount = getUnreadCountFromPayload(payload);
+        if (roomCode && typeof unreadCount === "number") {
+          setUnreadCounts((prev) => ({
+            ...prev,
+            [roomCode]: unreadCount,
+          }));
+        }
+      }
+    );
+
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
+  }, [wsConnected]);
+
+  useEffect(() => {
+    if (!wsConnected) return;
+
+    const unsubscribe = ChatWebSocketService.subscribeToGlobalRoomUpdates(
+      (updateData) => {
+        if (
+          updateData.type !== "ROOM_PREVIEW_UPDATE" &&
+          updateData.type !== "room_preview_update"
+        ) {
+          return;
+        }
+        const payload = updateData.payload || updateData;
+        const roomCode = payload.roomCode;
+        if (roomCode) {
+          updateRoomPreview(roomCode, payload);
+        }
+      }
+    );
+
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
+  }, [wsConnected, updateRoomPreview]);
+
+  useEffect(() => {
+    const activeRoomCode = selectedRoom?.roomCode || null;
+    if (!activeRoomCode) {
       console.log("선택된 채팅방이 없음");
       resetMessages();
       return;
     }
 
-    const roomCode = selectedRoom.roomCode;
-    if (!roomCode) return;
-
     const loadRoomMessages = async () => {
       try {
         const startTime = performance.now();
-        const isFirstAccess = !cacheWarmedRooms.has(roomCode);
+        const isFirstAccess = !cacheWarmedRooms.has(activeRoomCode);
 
         resetMessages();
-        const initialMessages = await loadInitialMessages(roomCode);
+        const initialMessages = await loadInitialMessages(activeRoomCode);
 
         const endTime = performance.now();
         const duration = endTime - startTime;
@@ -225,7 +381,7 @@ export const useUserChatController = () => {
         );
 
         if (isFirstAccess) {
-          setCacheWarmedRooms((prev) => new Set([...prev, roomCode]));
+          setCacheWarmedRooms((prev) => new Set([...prev, activeRoomCode]));
           setAfterRedisResults((prev) => ({
             ...prev,
             messageLoad: [...prev.messageLoad, duration],
@@ -243,7 +399,7 @@ export const useUserChatController = () => {
 
         if (initialMessages.length > 0) {
           const lastReadSeq = getLastReadSeq(initialMessages);
-          await handleMarkAsRead(roomCode, lastReadSeq);
+          await handleMarkAsRead(activeRoomCode, lastReadSeq);
         }
       } catch (error) {
         console.error("메시지 로딩 실패:", error);
@@ -251,12 +407,19 @@ export const useUserChatController = () => {
     };
 
     loadRoomMessages();
+  }, [selectedRoom?.roomCode]);
+
+  useEffect(() => {
+    const activeRoomCode = selectedRoom?.roomCode || null;
+    if (!activeRoomCode) {
+      return;
+    }
 
     const joinRoomAndSubscribe = async () => {
-      if (selectedRoom && wsConnected) {
+      if (activeRoomCode && wsConnected) {
         try {
           ChatWebSocketService.onMessage(
-            selectedRoom.roomCode,
+            activeRoomCode,
             (message) => {
               if (
                 message.type === "BUTTON_STATE_UPDATE" &&
@@ -266,7 +429,7 @@ export const useUserChatController = () => {
                 if (newState) {
                   setButtonStates((prev) => ({
                     ...prev,
-                    [selectedRoom.roomCode]: newState,
+                    [activeRoomCode]: newState,
                   }));
                 }
                 return;
@@ -275,7 +438,7 @@ export const useUserChatController = () => {
               if (message.roomState && isPlatformRoom(selectedRoom)) {
                 const newState = message.roomState.current;
                 console.log("🏠 Room state update received:", {
-                  roomCode: selectedRoom.roomCode,
+                  roomCode: activeRoomCode,
                   newState,
                   reason: message.roomState.transitionReason,
                   timestamp: message.roomState.timestamp,
@@ -283,35 +446,48 @@ export const useUserChatController = () => {
 
                 setButtonStates((prev) => ({
                   ...prev,
-                  [selectedRoom.roomCode]: newState,
+                  [activeRoomCode]: newState,
                 }));
               }
               console.log("@@@@@@@ New message!!! ", message);
               const resolvedMessageId = message.id || message.messageId;
+              const myUserId = currentUserIdRef.current;
+              const senderIdMatch =
+                myUserId !== null &&
+                myUserId !== undefined &&
+                message.senderId !== null &&
+                message.senderId !== undefined &&
+                String(message.senderId) === String(myUserId);
+              const normalizedSenderType =
+                message.senderType ||
+                (senderIdMatch ? "USER" : message.senderType);
               const newMessage = {
                 ...message,
                 id: resolvedMessageId,
                 messageId: resolvedMessageId,
                 seq: message.seq ?? message.payload?.seq,
+                senderType: normalizedSenderType,
                 unreadCount: message.unreadCount,
               };
 
+              updateRoomPreview(activeRoomCode, newMessage);
+
+              const isMyMessage =
+                senderIdMatch &&
+                (normalizedSenderType === "USER" || !normalizedSenderType);
               console.log("🔍 메시지 분기 체크:", {
                 messageSenderId: message.senderId,
-                currentUserId,
-                senderType: message.senderType,
+                currentUserId: myUserId,
+                senderType: normalizedSenderType,
                 senderName: message.senderName,
-                isMyMessage:
-                  message.senderId === currentUserId &&
-                  message.senderType === "USER",
+                isMyMessage,
                 fullMessage: message,
               });
 
               const currentMessages = messagesRef.current;
               let didMergeOptimistic = false;
               if (
-                message.senderType === "USER" &&
-                message.senderId === currentUserId &&
+                isMyMessage &&
                 currentMessages.length > 0
               ) {
                 const messageSentAt = newMessage.sentAt
@@ -322,8 +498,9 @@ export const useUserChatController = () => {
                     return false;
                   }
                   if (
-                    msg.senderType !== "USER" ||
-                    msg.senderId !== currentUserId
+                    msg.senderId === null ||
+                    msg.senderId === undefined ||
+                    String(msg.senderId) !== String(myUserId)
                   ) {
                     return false;
                   }
@@ -346,58 +523,137 @@ export const useUserChatController = () => {
                 }
               }
 
+              if (
+                !didMergeOptimistic &&
+                isMyMessage
+              ) {
+                const messageSentAt = newMessage.sentAt
+                  ? new Date(newMessage.sentAt).getTime()
+                  : null;
+                const now = Date.now();
+                pendingTempMessagesRef.current = (
+                  pendingTempMessagesRef.current || []
+                ).filter((temp) => {
+                  if (!temp?.sentAt) {
+                    return true;
+                  }
+                  const tempTime = new Date(temp.sentAt).getTime();
+                  return Number.isFinite(tempTime) && now - tempTime < 2 * 60 * 1000;
+                });
+                const pendingList = pendingTempMessagesRef.current;
+                const pendingIndex = pendingList.findIndex((temp) => {
+                  if (
+                    !temp ||
+                    temp.senderId === null ||
+                    temp.senderId === undefined ||
+                    String(temp.senderId) !== String(myUserId)
+                  ) {
+                    return false;
+                  }
+                  if (temp.content !== newMessage.content) {
+                    return false;
+                  }
+                  if (!messageSentAt || !temp.sentAt) {
+                    return true;
+                  }
+                  const tempSentAt = new Date(temp.sentAt).getTime();
+                  return Math.abs(tempSentAt - messageSentAt) <= 5000;
+                });
+
+                if (pendingIndex > -1) {
+                  const temp = pendingList[pendingIndex];
+                  pendingList.splice(pendingIndex, 1);
+                  if (temp?.tempId) {
+                    didMergeOptimistic = true;
+                    const tryMerge = () => {
+                      const hasTemp = messagesRef.current.some(
+                        (msg) => getMessageId(msg) === temp.tempId
+                      );
+                      if (hasTemp) {
+                        updateMessage(temp.tempId, {
+                          ...newMessage,
+                          clientTemp: false,
+                        });
+                        return true;
+                      }
+                      return false;
+                    };
+
+                    if (!tryMerge()) {
+                      setTimeout(() => {
+                        tryMerge();
+                      }, 80);
+                    }
+                  }
+                }
+              }
+
               if (!didMergeOptimistic) {
                 console.log("✅ USER SIDE - 메시지 추가:", newMessage);
                 addMessage(newMessage);
               }
 
-              const token = localStorage.getItem("access_token");
-              if (token) {
-                try {
-                  const decoded = jwtDecode(token);
-                  const currentUserId = decoded.memberId;
-
-                  if (
-                    message.senderType === "USER" &&
-                    message.senderId === currentUserId
-                  ) {
-                    console.log(
-                      "내가 보낸 메시지라 읽음 처리 요청 생략"
-                    );
-                    return;
-                  }
-
-                  console.log("상대방 메시지 자동 읽음 처리 시작");
-                  setTimeout(async () => {
-                    const lastReadSeq =
-                      typeof message.seq === "number" ? message.seq : null;
-                    await handleMarkAsRead(selectedRoom.roomCode, lastReadSeq);
-                  }, 100);
-                } catch (error) {
-                  console.error("토큰 디코딩 실패:", error);
-                }
+              if (isMyMessage) {
+                console.log("내가 보낸 메시지라 읽음 처리 요청 생략");
+                return;
               }
+
+              console.log("상대방 메시지 자동 읽음 처리 시작");
+              setTimeout(async () => {
+                const lastReadSeq =
+                  typeof message.seq === "number" ? message.seq : null;
+                await handleMarkAsRead(activeRoomCode, lastReadSeq);
+              }, 100);
             }
           );
 
           if (isPlatformRoom(selectedRoom)) {
             ChatWebSocketService.subscribeToButtonUpdates(
-              selectedRoom.roomCode,
+              activeRoomCode,
               (buttonData) => {
                 console.log("버튼 상태 업데이트:", buttonData);
                 if (buttonData.type === "BUTTON_STATE_UPDATE") {
-                  const { roomId, state } = buttonData.payload;
+                  const payload = buttonData.payload || buttonData;
+                  const roomId = payload.roomCode || payload.roomId;
+                  const state = payload.state;
                   setButtonStates((prev) => ({
                     ...prev,
                     [roomId]: state,
                   }));
+
+                  if (payload?.content && roomId === activeRoomCode) {
+                    const messageId = payload.messageId || payload.id;
+                    const exists = messageId
+                      ? messagesRef.current.some(
+                          (msg) => (msg.id || msg.messageId) === messageId
+                        )
+                      : false;
+
+                    if (!exists) {
+                      addMessage({
+                        id: messageId || `state-${Date.now()}`,
+                        messageId: messageId,
+                        seq: payload.seq,
+                        content: payload.content,
+                        senderId: payload.senderId || null,
+                        senderType: payload.senderType || "AI",
+                        senderName: payload.senderName,
+                        sentAt: payload.sentAt || new Date().toISOString(),
+                        unreadCount:
+                          typeof payload.unreadCount === "number"
+                            ? payload.unreadCount
+                            : 0,
+                      });
+                    }
+                    updateRoomPreview(roomId, payload);
+                  }
                 }
               }
             );
           }
 
           ChatWebSocketService.subscribeToUnreadUpdates(
-            selectedRoom.roomCode,
+            activeRoomCode,
             (unreadData) => {
               if (unreadData.type === "READ_STATUS_UPDATE") {
                 const payload = unreadData.payload || unreadData;
@@ -458,15 +714,15 @@ export const useUserChatController = () => {
                       });
                     }
 
-                    const roomCode =
+                    const resolvedRoomCode =
                       getRoomCodeFromPayload(payload, unreadData) ||
-                      selectedRoom?.roomCode ||
+                      activeRoomCode ||
                       null;
-                    if (roomCode) {
-                      console.log(`🔄 즉시 unreadCounts 업데이트: ${roomCode} → 0`);
+                    if (resolvedRoomCode) {
+                      console.log(`🔄 즉시 unreadCounts 업데이트: ${resolvedRoomCode} → 0`);
                       setUnreadCounts((prev) => ({
                         ...prev,
-                        [roomCode]: 0,
+                        [resolvedRoomCode]: 0,
                       }));
                     }
                   } catch (error) {
@@ -484,19 +740,19 @@ export const useUserChatController = () => {
               if (readerType && readerType !== "USER") {
                 return;
               }
-              const roomCode = getRoomCodeFromPayload(payload, unreadData);
+              const resolvedRoomCode = getRoomCodeFromPayload(payload, unreadData);
               const unreadCount = getUnreadCountFromPayload(payload);
-              if (roomCode && typeof unreadCount === "number") {
+              if (resolvedRoomCode && typeof unreadCount === "number") {
                 setUnreadCounts((prev) => ({
                   ...prev,
-                  [roomCode]: unreadCount,
+                  [resolvedRoomCode]: unreadCount,
                 }));
               }
             }
           );
 
-          console.log("채팅방 구독 완료:", selectedRoom.roomCode);
-          await ChatWebSocketService.joinRoom(selectedRoom.roomCode);
+          console.log("채팅방 구독 완료:", activeRoomCode);
+          await ChatWebSocketService.joinRoom(activeRoomCode);
         } catch (error) {
           console.error("채팅방 구독 실패:", error);
         }
@@ -506,11 +762,11 @@ export const useUserChatController = () => {
     joinRoomAndSubscribe();
 
     return () => {
-      if (selectedRoom) {
-        ChatWebSocketService.leaveRoom(selectedRoom.roomCode);
+      if (activeRoomCode) {
+        ChatWebSocketService.leaveRoom(activeRoomCode);
       }
     };
-  }, [selectedRoom, wsConnected]);
+  }, [selectedRoom?.roomCode, wsConnected]);
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedRoom || !wsConnected) return;
@@ -556,12 +812,23 @@ export const useUserChatController = () => {
         );
       }, 100);
 
+      const tempId = `temp-${Date.now()}`;
       addMessage({
         ...messagePayload,
-        id: `temp-${Date.now()}`,
+        id: tempId,
         clientTemp: true,
         unreadCount: 0,
       });
+      pendingTempMessagesRef.current = [
+        ...pendingTempMessagesRef.current,
+        {
+          tempId,
+          content: messagePayload.content,
+          senderId: userId,
+          sentAt: messagePayload.sentAt,
+        },
+      ];
+      updateRoomPreview(roomCode, messagePayload);
     } catch (error) {
       console.error("메시지 전송 실패:", error);
       setError("메시지 전송에 실패했습니다.");
@@ -602,7 +869,7 @@ export const useUserChatController = () => {
   };
 
   const handlePlatformButtonClick = async (roomCode, action) => {
-    if (!wsConnected) {
+    if (!ChatWebSocketService.isConnected()) {
       console.warn("WebSocket 연결이 없어 버튼 액션 불가");
       return;
     }

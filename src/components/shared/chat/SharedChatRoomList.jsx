@@ -79,7 +79,13 @@ export default function SharedChatRoomList({
 
   // Default room renderer
   const defaultRenderRoom = (room, isSelected, onSelect) => {
-    const unreadCount = unreadCounts[room.roomCode] || 0;
+    const mappedUnread = unreadCounts?.[room.roomCode];
+    const unreadCount =
+      typeof mappedUnread === 'number'
+        ? mappedUnread
+        : typeof room.unreadCount === 'number'
+        ? room.unreadCount
+        : 0;
     const badges = getRoomBadges ? getRoomBadges(room) : [];
     const customClass = getRoomClassName ? getRoomClassName(room) : '';
     

@@ -7,6 +7,8 @@ import { ROOM_STATES } from "../utils/roomStates";
 import {
   getLastReadSeq,
   getReaderTypeFromPayload,
+  getRoomCodeFromPayload,
+  getUnreadCountFromPayload,
   getMessageId,
   getReadSeqFromPayload,
 } from "../utils/messageUtils";
@@ -24,6 +26,7 @@ export const usePlatformAdminChatController = () => {
   const [requestingRooms, setRequestingRooms] = useState(new Set());
   const [showFailToast, setShowFailToast] = useState(false);
   const [failMessage, setFailMessage] = useState("");
+  const selectedRoomRef = useRef(null);
 
   const triggerToastFail = useCallback((message) => {
     setFailMessage(message);
@@ -51,6 +54,10 @@ export const usePlatformAdminChatController = () => {
   const messagesRef = useMessagesRef(messages);
   const isInitialLoad = loadingMessages;
   const lastReadStatusRefetchAt = useRef(new Map());
+
+  useEffect(() => {
+    selectedRoomRef.current = selectedRoom;
+  }, [selectedRoom]);
 
   const loadChatRooms = useCallback(async () => {
     try {
@@ -81,7 +88,10 @@ export const usePlatformAdminChatController = () => {
 
           return {
             ...room,
-            needsAttention: room.isWaitingForAdmin || room.hasUnansweredMessages,
+            needsAttention:
+              finalState === ROOM_STATES.WAITING_FOR_ADMIN ||
+              room.isWaitingForAdmin ||
+              room.hasUnansweredMessages,
             currentState: finalState,
           };
         });
@@ -93,6 +103,27 @@ export const usePlatformAdminChatController = () => {
       });
 
       setChatRooms(platformRooms);
+      setRequestingRooms(
+        new Set(
+          platformRooms
+            .filter((room) => room.currentState === ROOM_STATES.WAITING_FOR_ADMIN)
+            .map((room) => room.roomCode)
+        )
+      );
+
+      const currentSelectedRoom = selectedRoomRef.current;
+      if (currentSelectedRoom?.roomCode) {
+        const refreshedRoom = platformRooms.find(
+          (room) => room.roomCode === currentSelectedRoom.roomCode
+        );
+        if (refreshedRoom) {
+          setSelectedRoom((prev) =>
+            prev?.roomCode === refreshedRoom.roomCode
+              ? { ...prev, ...refreshedRoom }
+              : refreshedRoom
+          );
+        }
+      }
     } catch (err) {
       console.error("채팅방 목록 로드 실패:", err);
       setError("채팅방 목록을 불러올 수 없습니다.");
@@ -157,6 +188,55 @@ export const usePlatformAdminChatController = () => {
     };
   }, []);
 
+  const updateRoomPreview = useCallback((roomCode, messageLike) => {
+    if (!roomCode) return;
+    const payload = messageLike?.payload || messageLike || {};
+    const content =
+      payload?.content ||
+      payload?.lastMessage ||
+      messageLike?.content ||
+      messageLike?.lastMessage;
+    if (!content) return;
+
+    const sentAt =
+      payload?.sentAt ||
+      payload?.lastMessageAt ||
+      messageLike?.sentAt ||
+      messageLike?.lastMessageAt ||
+      new Date().toISOString();
+    const messageId =
+      payload?.messageId ||
+      payload?.lastMessageId ||
+      messageLike?.messageId ||
+      messageLike?.lastMessageId ||
+      messageLike?.id ||
+      payload?.id ||
+      null;
+
+    setChatRooms((prev) =>
+      prev.map((room) =>
+        room.roomCode === roomCode
+          ? {
+              ...room,
+              lastMessage: content,
+              lastMessageAt: sentAt,
+              lastMessageId: messageId || room.lastMessageId,
+            }
+          : room
+      )
+    );
+
+    setSelectedRoom((prev) => {
+      if (!prev || prev.roomCode !== roomCode) return prev;
+      return {
+        ...prev,
+        lastMessage: content,
+        lastMessageAt: sentAt,
+        lastMessageId: messageId || prev.lastMessageId,
+      };
+    });
+  }, []);
+
   const handleChatMessage = useCallback(
     (roomCode, message) => {
       const messageRoomCode = getMessageRoomCode(message);
@@ -172,14 +252,39 @@ export const usePlatformAdminChatController = () => {
         return;
       }
 
+      updateRoomPreview(roomCode, messageData);
       addMessage(messageData);
+
+      if (
+        messageData.senderType === "USER" &&
+        isConnected &&
+        ChatWebSocketService.isConnected()
+      ) {
+        const rawSeq = messageData.seq;
+        const lastReadSeq =
+          typeof rawSeq === "number"
+            ? rawSeq
+            : typeof rawSeq === "string"
+            ? Number(rawSeq)
+            : null;
+        if (Number.isFinite(lastReadSeq)) {
+          markAsRead(roomCode, lastReadSeq).catch((err) =>
+            console.error("플랫폼 관리자 읽음 처리 실패:", err)
+          );
+        }
+      }
     },
-    [addMessage, buildMessageData, getMessageRoomCode]
+    [addMessage, buildMessageData, getMessageRoomCode, isConnected, updateRoomPreview]
   );
 
   const handleSystemMessage = useCallback(
     (messageData, roomCode, shouldDisplayMessage = true) => {
       const roomState = messageData.roomState;
+      const buttonState = messageData?.payload?.state;
+      const previewPayload = messageData?.payload || messageData;
+      if (previewPayload?.content) {
+        updateRoomPreview(roomCode, previewPayload);
+      }
 
       if (roomState) {
         setChatRooms((prev) =>
@@ -220,6 +325,71 @@ export const usePlatformAdminChatController = () => {
             return room;
           })
         );
+
+        setSelectedRoom((prev) => {
+          if (!prev || prev.roomCode !== roomCode) {
+            return prev;
+          }
+          const nextState = roomState.current;
+          const isWaiting = nextState === ROOM_STATES.WAITING_FOR_ADMIN;
+          return {
+            ...prev,
+            currentState: nextState,
+            isWaitingForAdmin: isWaiting,
+            needsAttention: isWaiting || prev.hasUnansweredMessages,
+            hasAssignedAdmin: roomState.adminInfo ? true : prev.hasAssignedAdmin,
+            adminDisplayName: roomState.adminInfo?.displayName || prev.adminDisplayName,
+            lastAdminActivity: roomState.adminInfo?.lastActivity || prev.lastAdminActivity,
+          };
+        });
+
+        setRequestingRooms((prev) => {
+          const next = new Set(prev);
+          if (roomState.current === ROOM_STATES.WAITING_FOR_ADMIN) {
+            next.add(roomCode);
+          } else {
+            next.delete(roomCode);
+          }
+          return next;
+        });
+      } else if (messageData?.type === "BUTTON_STATE_UPDATE" && buttonState) {
+        setChatRooms((prev) =>
+          prev.map((room) => {
+            if (room.roomCode === roomCode) {
+              const isWaiting = buttonState === ROOM_STATES.WAITING_FOR_ADMIN;
+              return {
+                ...room,
+                currentState: buttonState,
+                isWaitingForAdmin: isWaiting,
+                needsAttention: isWaiting || room.hasUnansweredMessages,
+              };
+            }
+            return room;
+          })
+        );
+
+        setSelectedRoom((prev) => {
+          if (!prev || prev.roomCode !== roomCode) {
+            return prev;
+          }
+          const isWaiting = buttonState === ROOM_STATES.WAITING_FOR_ADMIN;
+          return {
+            ...prev,
+            currentState: buttonState,
+            isWaitingForAdmin: isWaiting,
+            needsAttention: isWaiting || prev.hasUnansweredMessages,
+          };
+        });
+
+        setRequestingRooms((prev) => {
+          const next = new Set(prev);
+          if (buttonState === ROOM_STATES.WAITING_FOR_ADMIN) {
+            next.add(roomCode);
+          } else {
+            next.delete(roomCode);
+          }
+          return next;
+        });
       }
 
       switch (messageData.type) {
@@ -228,6 +398,32 @@ export const usePlatformAdminChatController = () => {
           break;
         case "BUTTON_STATE_UPDATE":
           console.log("🔘 Button state update:", messageData.payload?.state);
+          if (shouldDisplayMessage && messageData.payload?.content) {
+            const payload = messageData.payload;
+            const messageId = payload.messageId || payload.id;
+            const exists = messageId
+              ? messagesRef.current.some(
+                  (msg) => getMessageId(msg) === messageId
+                )
+              : false;
+
+            if (!exists) {
+              addMessage({
+                id: messageId || `state-${Date.now()}`,
+                messageId: messageId,
+                seq: payload.seq,
+                senderId: payload.senderId || null,
+                senderType: payload.senderType || "AI",
+                senderName: payload.senderName,
+                content: payload.content,
+                sentAt: payload.sentAt || new Date().toISOString(),
+                unreadCount:
+                  typeof payload.unreadCount === "number"
+                    ? payload.unreadCount
+                    : 0,
+              });
+            }
+          }
           break;
         case "ADMIN_ASSIGNMENT_UPDATE":
           console.log("👨‍💼 Admin assignment update:", messageData.payload);
@@ -316,7 +512,7 @@ export const usePlatformAdminChatController = () => {
           console.log("🤷‍♂️ Unknown system message type:", messageData.type);
       }
     },
-    [setChatRooms, addMessage]
+    [setChatRooms, setSelectedRoom, setRequestingRooms, addMessage, updateRoomPreview]
   );
 
   const handleRoomSelect = useCallback(
@@ -431,8 +627,7 @@ export const usePlatformAdminChatController = () => {
                         didUpdateLocal = true;
                       }
 
-                      const shouldRefetch =
-                        !didUpdateLocal || currentMessages.length === 0;
+                      const shouldRefetch = currentMessages.length === 0;
                       if (shouldRefetch && selectedRoom && selectedRoom.roomCode) {
                         const now = Date.now();
                         const lastRefetch =
@@ -469,7 +664,7 @@ export const usePlatformAdminChatController = () => {
                       }
                     }
                   }
-                  if (readerType === "ADMIN") {
+                  if (readerType === "ADMIN" || readerType === "AI") {
                     try {
                       const currentMessages = messagesRef.current;
 
@@ -610,7 +805,7 @@ export const usePlatformAdminChatController = () => {
     }
 
     try {
-      await ChatWebSocketService.takeOverChat(selectedRoom.roomCode);
+      await ChatWebSocketService.acceptHandoff(selectedRoom.roomCode);
 
       setRequestingRooms((prev) => {
         const newSet = new Set(prev);
@@ -623,9 +818,16 @@ export const usePlatformAdminChatController = () => {
     }
   }, [selectedRoom, hasAdminPermission, triggerToastFail]);
 
-  const triggerHandoffNotification = useCallback(() => {
+  const triggerHandoffNotification = useCallback((roomCode) => {
     console.log("🔔 Triggering handoff notification...");
     setHasNewHandoffRequest(true);
+    if (roomCode) {
+      setRequestingRooms((prev) => {
+        const next = new Set(prev);
+        next.add(roomCode);
+        return next;
+      });
+    }
 
     setTimeout(() => {
       loadChatRooms();
@@ -658,20 +860,31 @@ export const usePlatformAdminChatController = () => {
       await ChatWebSocketService.connect(token, userId);
       setIsConnected(true);
 
-      console.log("🔗 Setting up platform admin notifications subscription...");
-      ChatWebSocketService.subscribeToPlatformAdminUpdates((updateData) => {
-        console.log("🚨 Platform admin update received:", updateData);
+        console.log("🔗 Setting up platform admin notifications subscription...");
+        ChatWebSocketService.subscribeToPlatformAdminUpdates((updateData) => {
+          console.log("🚨 Platform admin update received:", updateData);
+          const payload = updateData?.payload || updateData;
+          const roomCode =
+            payload?.roomCode ||
+            payload?.roomId ||
+            updateData?.roomCode ||
+            updateData?.roomId ||
+            null;
 
-        if (
-          updateData.type === "HANDOFF_REQUEST" ||
-          updateData.type === "PLATFORM_HANDOFF_REQUEST" ||
-          (updateData.type === "BUTTON_STATE_UPDATE" &&
-            updateData.payload?.state === "WAITING_FOR_ADMIN")
-        ) {
-          console.log("🔔 New handoff request detected!");
-          triggerHandoffNotification();
-        }
-      });
+          if (
+            updateData.type === "HANDOFF_REQUEST" ||
+            updateData.type === "PLATFORM_HANDOFF_REQUEST" ||
+            (updateData.type === "BUTTON_STATE_UPDATE" &&
+              updateData.payload?.state === "WAITING_FOR_ADMIN")
+          ) {
+            console.log("🔔 New handoff request detected!");
+            triggerHandoffNotification(roomCode);
+          }
+
+          if (roomCode && updateData?.roomState) {
+            handleSystemMessage(updateData, roomCode, false);
+          }
+        });
 
       ChatWebSocketService.subscribeToUserErrors((errorData) => {
         console.log("❌ WebSocket error received:", errorData);
@@ -682,28 +895,28 @@ export const usePlatformAdminChatController = () => {
         }
       });
 
-      window.globalPlatformNotificationHandler = (data, roomCode) => {
-        console.log("🔍 Global handler - checking room message for handoff:", {
-          data,
-          roomCode,
-        });
+        window.globalPlatformNotificationHandler = (data, roomCode) => {
+          console.log("🔍 Global handler - checking room message for handoff:", {
+            data,
+            roomCode,
+          });
 
-        if (
-          data.type === "AI_HANDOFF_REQUEST" ||
-          data.type === "PLATFORM_HANDOFF_REQUEST" ||
-          (data.type === "BUTTON_STATE_UPDATE" &&
-            data.payload?.state === "WAITING_FOR_ADMIN")
-        ) {
-          console.log("🔔 Handoff request detected from global handler:", roomCode);
-          triggerHandoffNotification();
-        }
-      };
+          if (
+            data.type === "AI_HANDOFF_REQUEST" ||
+            data.type === "PLATFORM_HANDOFF_REQUEST" ||
+            (data.type === "BUTTON_STATE_UPDATE" &&
+              data.payload?.state === "WAITING_FOR_ADMIN")
+          ) {
+            console.log("🔔 Handoff request detected from global handler:", roomCode);
+            triggerHandoffNotification(roomCode);
+          }
+        };
     } catch (err) {
       console.error("WebSocket 연결 실패:", err);
       setError("실시간 연결에 실패했습니다.");
       setIsConnected(false);
     }
-  }, [triggerHandoffNotification]);
+  }, [triggerHandoffNotification, handleSystemMessage]);
 
   useEffect(() => {
     connectWebSocket();
@@ -744,6 +957,34 @@ export const usePlatformAdminChatController = () => {
   }, [connectWebSocket]);
 
   useEffect(() => {
+    if (!isConnected) return;
+
+    const unsubscribe = ChatWebSocketService.subscribeToGlobalUnreadUpdates(
+      (unreadData) => {
+        const payload = unreadData.payload || unreadData;
+        const readerType = getReaderTypeFromPayload(payload);
+        if (readerType && readerType !== "ADMIN") {
+          return;
+        }
+        const roomCode = getRoomCodeFromPayload(payload, unreadData);
+        const unreadCount = getUnreadCountFromPayload(payload);
+        if (roomCode && typeof unreadCount === "number") {
+          setUnreadCounts((prev) => ({
+            ...prev,
+            [roomCode]: unreadCount,
+          }));
+        }
+      }
+    );
+
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
+  }, [isConnected]);
+
+  useEffect(() => {
     if (isConnected && chatRooms.length > 0) {
       console.log("🌐 Setting up global message handlers for all platform rooms");
       const cleanupFunctions = [];
@@ -761,7 +1002,7 @@ export const usePlatformAdminChatController = () => {
               if (messageData.type) {
                 handleSystemMessage(messageData, room.roomCode, false);
               } else {
-                console.log("🔧 GLOBAL - No type field, ignoring message");
+                updateRoomPreview(room.roomCode, messageData);
               }
             }
           );
@@ -780,7 +1021,7 @@ export const usePlatformAdminChatController = () => {
         cleanupFunctions.forEach((cleanup) => cleanup());
       };
     }
-  }, [isConnected, chatRooms, handleSystemMessage]);
+  }, [isConnected, chatRooms, handleSystemMessage, updateRoomPreview]);
 
   const getRoomPriority = (room) => {
     if (room.needsAttention) return 100;
@@ -799,12 +1040,6 @@ export const usePlatformAdminChatController = () => {
 
   const getRoomAvatar = (room) => {
     const currentState = determineRoomState(room);
-
-    console.log(
-      "🖼️ AVATAR:",
-      room.roomCode,
-      currentState === ROOM_STATES.ADMIN_ACTIVE ? "👤 HUMAN" : "🤖 ROBOT"
-    );
 
     if (currentState === ROOM_STATES.ADMIN_ACTIVE) {
       return "https://fonts.gstatic.com/s/e/notoemoji/latest/1f464/emoji.svg";
