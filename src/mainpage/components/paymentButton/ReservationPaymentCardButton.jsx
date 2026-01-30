@@ -95,10 +95,10 @@ function ReservationPaymentCardButton({
         userType = "MEMBER";
       }
 
-      window.IMP.init("imp13502610");
+      window.IMP.init(import.meta.env.VITE_PORTONE_CUSTOMER_CODE);
       window.IMP.request_pay(
         {
-          pg: "uplus",
+          pg: import.meta.env.VITE_PORTONE_PG,
           pay_method: "card",
           merchant_uid: "order_" + new Date().getTime(),
           name,
@@ -170,6 +170,7 @@ function ReservationPaymentCardButton({
               }
             }
           } else {
+            console.log("PortOne 결제 실패:", rsp.error_msg, rsp);
             try {
               await deleteReservationPending(reservationId);
               console.log(
@@ -221,5 +222,6 @@ function ReservationPaymentCardButton({
     </>
   );
 }
+
 
 export default ReservationPaymentCardButton;

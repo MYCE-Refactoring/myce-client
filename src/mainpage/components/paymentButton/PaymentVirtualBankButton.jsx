@@ -93,10 +93,10 @@ function PaymentVirtualBankButton({
         userType = "MEMBER";
       }
 
-      window.IMP.init("imp13502610");
+      window.IMP.init(import.meta.env.VITE_PORTONE_CUSTOMER_CODE);
       window.IMP.request_pay(
         {
-          pg: "uplus", // 토스페이먼츠 v1 모듈 pg사
+          pg: import.meta.env.VITE_PORTONE_PG,
           pay_method: "vbank",
           merchant_uid: "order_" + new Date().getTime(),
           name, // props에서 받아온 상품명
@@ -106,7 +106,9 @@ function PaymentVirtualBankButton({
           buyer_tel: buyerTel,
         },
         async function (rsp) {
+          console.log("PortOne 응답 전체:", rsp);
           if (rsp.success) {
+            console.log("imp_uid:", rsp.imp_uid, "status:", rsp.status);
             onPaymentStart?.();
             // 결제 성공 시 백엔드에 imp_uid, merchant_uid 전달해서 검증 요청
             try {
@@ -165,7 +167,7 @@ function PaymentVirtualBankButton({
             }
           } else {
             onPaymentEnd?.();
-            console.log("결제가 취소되었습니다.");
+            console.log("PortOne 결제 실패:", rsp.error_msg, rsp);
             showFailMessage("결제가 취소되었습니다. 다시 시도해주세요.");
             navigate(`/detail/${expoId}`);
           }

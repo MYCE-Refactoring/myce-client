@@ -36,10 +36,10 @@ function PaymentTransferButton({ name, amount, buyer, targetType, onPaymentStart
     setLoading(true);
 
     try {
-      window.IMP.init("imp13502610");
+      window.IMP.init(import.meta.env.VITE_PORTONE_CUSTOMER_CODE);
       window.IMP.request_pay(
         {
-          pg: "uplus",
+          pg: import.meta.env.VITE_PORTONE_PG,
           pay_method: "trans",
           merchant_uid: "order_" + new Date().getTime(),
           name,
