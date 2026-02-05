@@ -3,18 +3,13 @@ name: Deploy Frontend to S3
 on:
   push:
     branches:
-      - develop
+      - main
 
-# Prevent concurrent deployments to the same environment
 concurrency:
   group: deploy-frontend-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
-  S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME || 'myce-frontend-bucket' }}
-  VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || 'https://api.myce.live/api' }}
-  CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
 
 jobs:
   deploy:
@@ -22,108 +17,42 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: 📥 Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 🟢 Setup Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
-      - name: 📦 Install dependencies
-        run: npm ci
+      - name: Cache node module
+        uses: actions/cache@v3
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+              ${{ runner.os }}-node-
 
-      - name: 🔧 Build project
+      - name: Install dependencies
+        run: npm Install
+      
+      - name: Build 
         env:
-          VITE_API_BASE_URL: ${{ env.VITE_API_BASE_URL }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
           VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
-          # Add other VITE_ environment variables here as needed
-          # VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
-          # VITE_KAKAO_CLIENT_ID: ${{ vars.VITE_KAKAO_CLIENT_ID }}
         run: npm run build
 
-      - name: 🧪 Verify build output
-        run: |
-          echo "Build completed. Checking dist folder:"
-          ls -la dist/
-          echo "Dist folder size:"
-          du -sh dist/
-
-      - name: ⚙️ Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v3
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
 
-      - name: 📤 Deploy to S3
-        run: |
-          echo "Syncing files to S3 bucket: ${{ env.S3_BUCKET_NAME }}"
-          aws s3 sync dist/ s3://${{ env.S3_BUCKET_NAME }} \
-            --delete \
-            --cache-control "public, max-age=31536000" \
-            --exclude "*.html" \
-            --exclude "service-worker.js"
-          
-          # Set shorter cache for HTML files and service worker
-          aws s3 sync dist/ s3://${{ env.S3_BUCKET_NAME }} \
-            --cache-control "public, max-age=0, must-revalidate" \
-            --include "*.html" \
-            --include "service-worker.js"
+      - name: Deploy to S3
+        run: aws s3 sync ./dist s3://${{ secrets.CLIENT_BUCKET_NAME }} --delete
 
-      - name: ♻️ Invalidate CloudFront cache
-        if: ${{ env.CLOUDFRONT_DISTRIBUTION_ID != '' }}
-        run: |
-          echo "Invalidating CloudFront distribution: ${{ env.CLOUDFRONT_DISTRIBUTION_ID }}"
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ env.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/*" \
-            --query 'Invalidation.Id' \
-            --output text
-
-      - name: ✅ Deployment summary
-        run: |
-          echo "🎉 Deployment completed successfully!"
-          echo "📍 S3 Bucket: ${{ env.S3_BUCKET_NAME }}"
-          echo "🌍 Region: ${{ env.AWS_REGION }}"
-          echo "🔗 Frontend URL: https://www.myce.live"
-          if [ -n "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" ]; then
-            echo "☁️ CloudFront cache invalidated"
-          fi
-
-      - name: 🎉 프론트엔드 배포 성공 알림
-        if: success()
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_MESSAGE: |
-            🎉 *프론트엔드 배포 완료!*
-            
-            📍 **S3 버킷:** ${{ env.S3_BUCKET_NAME }}
-            🌍 **리전:** ${{ env.AWS_REGION }}
-            🔗 **라이브 URL:** https://www.myce.live
-            📝 **브랜치:** ${{ github.ref_name }}
-            👤 **배포자:** ${{ github.actor }}
-          SLACK_TITLE: 'Myce 프론트엔드 배포'
-          SLACK_COLOR: 'good'
-          SLACK_USERNAME: 'GitHub Actions'
-          SLACK_ICON: ':rocket:'
-
-      - name: ❌ 프론트엔드 배포 실패 알림
-        if: failure()
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_MESSAGE: |
-            ❌ *프론트엔드 배포 실패*
-            
-            📍 **S3 버킷:** ${{ env.S3_BUCKET_NAME }}
-            🌍 **리전:** ${{ env.AWS_REGION }}
-            📝 **브랜치:** ${{ github.ref_name }}
-            👤 **시도한 사람:** ${{ github.actor }}
-            🔍 **로그 확인:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SLACK_TITLE: 'Myce 프론트엔드 배포'
-          SLACK_COLOR: 'danger'
-          SLACK_USERNAME: 'GitHub Actions'
-          SLACK_ICON: ':x:'
+      # CloudFront 캐시 무효화
+      # - name: Invalidate CloudFront Cache
+      #   run: aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_ID }} --paths "/*"
