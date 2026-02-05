@@ -9,8 +9,6 @@ concurrency:
   group: deploy-frontend-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-
 jobs:
   deploy:
     name: Build and Deploy to S3
