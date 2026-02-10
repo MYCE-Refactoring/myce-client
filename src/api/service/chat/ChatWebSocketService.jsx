@@ -134,7 +134,7 @@ const connect = async (token, userId) => {
     const getWebSocketURL = () => {
       const baseUrl = import.meta.env.DEV
         ? 'http://localhost:8083/ws/chat'
-        : 'https://api.myce.live/ws/chat';
+        : 'https://myce.cloud/ws/chat';
       return `${baseUrl}?ticket=${ticket}`;
     };
 
