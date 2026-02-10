@@ -18,7 +18,8 @@ export default function NotificationButton({notification}) {
   const fetchUnreadCount = async () => {
     try {
       const notifications = await getNotifications();
-      const unreadNotifications = notifications.filter(n => !n.isRead);
+      const items = notifications?.content ?? [];
+      const unreadNotifications = items.filter(n => !n.isRead);
       updateUnreadCount(unreadNotifications.length);
     } catch (error) {
       console.error(t('components.notification.button.errorFetch'), error);
