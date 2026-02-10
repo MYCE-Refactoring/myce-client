@@ -2,7 +2,7 @@ import { EventSourcePolyfill } from 'event-source-polyfill';
 import { HttpStatusCode } from 'axios';
 import { reissue, setAccessTokenToStorage } from '../../auth/AuthService';
 
-const baseURL = `${import.meta.env.VITE_API_BASE_URL}/sse/subscribe`;
+const baseURL = `${import.meta.env.VITE_API_BASE_URL}/notifications/sse/subscribe`;
 const MAX_REFRESH_COUNT = 3;
 
 export const createSseInstance = (onMessage, onError) => {
