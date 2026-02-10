@@ -23,7 +23,7 @@ export default function NotificationModal({ onClose }) {
     try {
       setLoading(true);
       const data = await getNotifications();
-      setNotifications(data);
+      setNotifications(data?.content ?? []); 
     } catch (error) {
       console.error(t('components.notification.modal.errors.fetchFailed'), error);
     } finally {
