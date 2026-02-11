@@ -193,17 +193,15 @@ export const useUserChatController = () => {
       setCurrentUserId(userId);
 
       if (ChatWebSocketService.isConnected()) {
-        setWsConnected(true);
         return;
       }
 
       console.log("WebSocket 연결 시도...", userId);
       await ChatWebSocketService.connect(token, userId);
-      setWsConnected(true);
+      // wsConnected는 addConnectionListener 콜백에서 설정됨
       console.log("WebSocket 연결 성공");
     } catch (error) {
       console.error("WebSocket 연결 실패:", error);
-      setWsConnected(false);
     }
   }, []);
 
@@ -416,7 +414,7 @@ export const useUserChatController = () => {
     }
 
     const joinRoomAndSubscribe = async () => {
-      if (activeRoomCode && wsConnected) {
+      if (activeRoomCode && wsConnected && ChatWebSocketService.isConnected()) {
         try {
           ChatWebSocketService.onMessage(
             activeRoomCode,
