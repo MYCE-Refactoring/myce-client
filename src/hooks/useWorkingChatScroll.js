@@ -294,12 +294,29 @@ export function useWorkingChatScroll(loadMessagesFn) {
           : String(newMessage.seq);
       const exists = prev.some(msg => {
         const existingId = msg.id || msg.messageId;
+        // 1) id 일치
         if (newId && existingId && existingId === newId) {
           return true;
         }
+        // 2) seq 일치
         const existingSeq =
           msg.seq === null || msg.seq === undefined ? null : String(msg.seq);
-        return newSeq && existingSeq && existingSeq === newSeq;
+        if (newSeq && existingSeq && existingSeq === newSeq) {
+          return true;
+        }
+        // 3) clientTemp 메시지와 서버 메시지 중복 방지:
+        //    같은 senderId + 같은 content + 5초 이내 sentAt
+        if (msg.clientTemp && newMessage.content && msg.content === newMessage.content) {
+          if (msg.senderId != null && newMessage.senderId != null &&
+              String(msg.senderId) === String(newMessage.senderId)) {
+            const msgTime = msg.sentAt ? new Date(msg.sentAt).getTime() : null;
+            const newTime = newMessage.sentAt ? new Date(newMessage.sentAt).getTime() : null;
+            if (!msgTime || !newTime || Math.abs(msgTime - newTime) <= 5000) {
+              return true;
+            }
+          }
+        }
+        return false;
       });
       if (exists) {
         console.log('⚠️ Message already exists, skipping:', newMessage.id);
