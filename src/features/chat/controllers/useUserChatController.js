@@ -482,87 +482,23 @@ export const useUserChatController = () => {
                 fullMessage: message,
               });
 
-              const currentMessages = messagesRef.current;
+              // Optimistic update merge: 내가 보낸 메시지의 temp와 서버 응답 매칭
               let didMergeOptimistic = false;
-              if (
-                isMyMessage &&
-                currentMessages.length > 0
-              ) {
-                const messageSentAt = newMessage.sentAt
-                  ? new Date(newMessage.sentAt).getTime()
-                  : null;
-                const tempMatch = currentMessages.find((msg) => {
-                  if (!msg?.clientTemp) {
-                    return false;
-                  }
-                  if (
-                    msg.senderId === null ||
-                    msg.senderId === undefined ||
-                    String(msg.senderId) !== String(myUserId)
-                  ) {
-                    return false;
-                  }
-                  if (msg.content !== newMessage.content) {
-                    return false;
-                  }
-                  if (!messageSentAt || !msg.sentAt) {
-                    return true;
-                  }
-                  const tempSentAt = new Date(msg.sentAt).getTime();
-                  return Math.abs(tempSentAt - messageSentAt) <= 5000;
-                });
-
-                if (tempMatch && tempMatch.id) {
-                  updateMessage(tempMatch.id, {
-                    ...newMessage,
-                    clientTemp: false,
-                  });
-                  didMergeOptimistic = true;
-                }
-              }
-
-              if (
-                !didMergeOptimistic &&
-                isMyMessage
-              ) {
-                const messageSentAt = newMessage.sentAt
-                  ? new Date(newMessage.sentAt).getTime()
-                  : null;
-                const now = Date.now();
-                pendingTempMessagesRef.current = (
-                  pendingTempMessagesRef.current || []
-                ).filter((temp) => {
-                  if (!temp?.sentAt) {
-                    return true;
-                  }
-                  const tempTime = new Date(temp.sentAt).getTime();
-                  return Number.isFinite(tempTime) && now - tempTime < 2 * 60 * 1000;
-                });
-                const pendingList = pendingTempMessagesRef.current;
+              if (isMyMessage) {
+                const pendingList = pendingTempMessagesRef.current || [];
                 const pendingIndex = pendingList.findIndex((temp) => {
-                  if (
-                    !temp ||
-                    temp.senderId === null ||
-                    temp.senderId === undefined ||
-                    String(temp.senderId) !== String(myUserId)
-                  ) {
-                    return false;
-                  }
-                  if (temp.content !== newMessage.content) {
-                    return false;
-                  }
-                  if (!messageSentAt || !temp.sentAt) {
-                    return true;
-                  }
-                  const tempSentAt = new Date(temp.sentAt).getTime();
-                  return Math.abs(tempSentAt - messageSentAt) <= 5000;
+                  if (!temp) return false;
+                  if (temp.content !== newMessage.content) return false;
+                  if (String(temp.senderId) !== String(myUserId)) return false;
+                  return true;
                 });
 
                 if (pendingIndex > -1) {
                   const temp = pendingList[pendingIndex];
                   pendingList.splice(pendingIndex, 1);
+                  didMergeOptimistic = true;
+
                   if (temp?.tempId) {
-                    didMergeOptimistic = true;
                     const tryMerge = () => {
                       const hasTemp = messagesRef.current.some(
                         (msg) => getMessageId(msg) === temp.tempId
@@ -579,7 +515,9 @@ export const useUserChatController = () => {
 
                     if (!tryMerge()) {
                       setTimeout(() => {
-                        tryMerge();
+                        if (!tryMerge()) {
+                          setTimeout(() => tryMerge(), 150);
+                        }
                       }, 80);
                     }
                   }
@@ -587,7 +525,6 @@ export const useUserChatController = () => {
               }
 
               if (!didMergeOptimistic) {
-                console.log("✅ USER SIDE - 메시지 추가:", newMessage);
                 addMessage(newMessage);
               }
 
@@ -786,6 +723,26 @@ export const useUserChatController = () => {
         sentAt: currentTime.toISOString(),
       };
 
+      // 1. temp 메시지를 먼저 등록 (서버 응답보다 반드시 먼저 준비되어야 함)
+      const tempId = `temp-${Date.now()}`;
+      pendingTempMessagesRef.current = [
+        ...pendingTempMessagesRef.current,
+        {
+          tempId,
+          content: messagePayload.content,
+          senderId: userId,
+          sentAt: messagePayload.sentAt,
+        },
+      ];
+      addMessage({
+        ...messagePayload,
+        id: tempId,
+        clientTemp: true,
+        unreadCount: 0,
+      });
+      updateRoomPreview(roomCode, messagePayload);
+
+      // 2. WebSocket 전송 (서버 응답이 오기 전에 위 등록이 완료됨)
       const startTime = performance.now();
       ChatWebSocketService.sendMessage(roomCode, content);
       setNewMessage("");
@@ -809,24 +766,6 @@ export const useUserChatController = () => {
           JSON.stringify(existingData)
         );
       }, 100);
-
-      const tempId = `temp-${Date.now()}`;
-      addMessage({
-        ...messagePayload,
-        id: tempId,
-        clientTemp: true,
-        unreadCount: 0,
-      });
-      pendingTempMessagesRef.current = [
-        ...pendingTempMessagesRef.current,
-        {
-          tempId,
-          content: messagePayload.content,
-          senderId: userId,
-          sentAt: messagePayload.sentAt,
-        },
-      ];
-      updateRoomPreview(roomCode, messagePayload);
     } catch (error) {
       console.error("메시지 전송 실패:", error);
       setError("메시지 전송에 실패했습니다.");
